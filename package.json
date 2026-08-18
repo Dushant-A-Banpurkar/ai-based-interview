@@ -1,0 +1,41 @@
+{
+  "name": "ai-based-interview",
+  "version": "1.0.0",
+  "description": "This is a AI interviewer, which takes interview of person and help them to prepare.",
+  "main": "main.ts",
+  "module": "",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dushant-A-Banpurkar/ai-based-interview.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Dushant-A-Banpurkar/ai-based-interview/issues"
+  },
+  "homepage": "https://github.com/Dushant-A-Banpurkar/ai-based-interview#readme",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
+    "@deepgram/sdk": "^5.8.0",
+    "bullmq": "^6.1.2",
+    "dockerode": "^5.0.1",
+    "express": "^5.2.1",
+    "meyda": "^5.6.3",
+    "mongoose": "^9.9.2",
+    "openai": "^7.4.0",
+    "socket.io": "^4.8.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
