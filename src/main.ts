@@ -1,2 +1,3 @@
-const greeting: string="AI Interview"
-console.log(greeting)
+import express from "express"
+
+const app=express();
