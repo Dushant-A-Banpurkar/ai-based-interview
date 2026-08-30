@@ -2,7 +2,7 @@ import { Queue, Worker } from "bullmq";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import Redis from "ioredis";
 import * as dotenv from "dotenv";
-
+dotenv.config();
 const connection = new Redis(process.env.REDIS_URL!, {
   maxRetriesPerRequest: null,
 });

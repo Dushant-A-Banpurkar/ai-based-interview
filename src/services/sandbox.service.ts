@@ -1,5 +1,6 @@
 import axios from "axios";
 import * as dotenv from "dotenv";
+dotenv.config();
 interface ExecutionResult {
   stdout: string | null;
   stderr: string | null;

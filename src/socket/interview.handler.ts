@@ -6,7 +6,7 @@ import {
 } from "../schemas/interviewSocket.schema";
 import * as dotenv from "dotenv";
 
-
+dotenv.config();
 
 const registerInterviewHandlers=async (io: Server, socket: Socket)=> {
   const interviewId = socket.handshake.query.interviewId as string;
