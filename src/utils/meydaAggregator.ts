@@ -17,7 +17,7 @@ export interface MetricSummary {
 export interface AggregatedAudioTelementry {
   frameCount: number;
   durationSeconds: number;
-  silecneRatio: number;
+  silenceRatio: number;
   rms: MetricSummary;
   spectralCentroid: MetricSummary;
   zcr: MetricSummary;
@@ -69,7 +69,7 @@ export function aggregateMeydaTelementry(
 
     return {
       mean: Number(mean.toFixed(4)),
-      variance: Number(mean.toFixed(4)),
+      variance: Number(variance.toFixed(4)),
       stdDev: Number(stdDev.toFixed(4)),
       min: Number(min.toFixed(4)),
       max: Number(max.toFixed(4)),
@@ -92,23 +92,25 @@ export function aggregateMeydaTelementry(
   let pitchVariability:AggregatedAudioTelementry['derivedInsight']['pitchVariability'];
   if(centroidCV<0.18) pitchVariability='Monotune';
   else if(centroidCV>0.5) pitchVariability='Highly Variable';
+  else pitchVariability='Balanced';
 
   let vocalHesitationEstimate:AggregatedAudioTelementry['derivedInsight']['vocalHesitationEstimate'];
   if(silenceRatio>0.35 || zcrStats.stdDev>12) vocalHesitationEstimate='High';
   else if(silenceRatio>0.2 || zcrStats.stdDev >6) vocalHesitationEstimate='Moderate';
+  else vocalHesitationEstimate='Low';
 
   return{
     frameCount,
     durationSeconds:Number(durationSeconds.toFixed(2)),
     silenceRatio,
     rms:rmsStats,
-    spectralCentroid:centroidCV,
+    spectralCentroid:centroidStats,
     zcr:zcrStats,
     ...(energyStats && {energy:energyStats}),
     derivedInsight:{
         volumeStability,
         pitchVariability,
-        vocalHesitationEstimate
+        vocalHesitationEstimate,
     },
 
   };
