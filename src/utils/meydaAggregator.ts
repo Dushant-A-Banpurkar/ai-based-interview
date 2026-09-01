@@ -14,7 +14,7 @@ export interface MetricSummary {
   max: number;
 }
 
-export interface AggregatedAudioTelementry {
+export interface AggregatedAudioTelemetry {
   frameCount: number;
   durationSeconds: number;
   silenceRatio: number;
@@ -32,7 +32,7 @@ export interface AggregatedAudioTelementry {
 export function aggregateMeydaTelementry(
   frames: RawMeydaFrame[],
   slienceThresholdRms = 0.015,
-): AggregatedAudioTelementry | null {
+): AggregatedAudioTelemetry | null {
   if (!frames || frames.length === 0) {
     return null;
   }
@@ -82,22 +82,23 @@ export function aggregateMeydaTelementry(
   const energyStats=energyValues?computeStats(energyValues):undefined;
 
   const rmsCV=rmsStats.mean>0?rmsStats.stdDev/rmsStats.mean:0;
-  let volumeStability:AggregatedAudioTelementry['derivedInsight']['volumeStability'];
+  let volumeStability:AggregatedAudioTelemetry['derivedInsight']['volumeStability'];
   if(rmsCV<0.35) volumeStability='High';
   else if(rmsCV<0.65) volumeStability='Moderate';
   else if(rmsCV<0.95) volumeStability='Low';
   else volumeStability='Unstable';
 
   const centroidCV=centroidStats.mean>0?centroidStats.stdDev/centroidStats.mean:0;
-  let pitchVariability:AggregatedAudioTelementry['derivedInsight']['pitchVariability'];
+  let pitchVariability:AggregatedAudioTelemetry['derivedInsight']['pitchVariability'];
   if(centroidCV<0.18) pitchVariability='Monotune';
   else if(centroidCV>0.5) pitchVariability='Highly Variable';
   else pitchVariability='Balanced';
 
-  let vocalHesitationEstimate:AggregatedAudioTelementry['derivedInsight']['vocalHesitationEstimate'];
+  let vocalHesitationEstimate:AggregatedAudioTelemetry['derivedInsight']['vocalHesitationEstimate'];
   if(silenceRatio>0.35 || zcrStats.stdDev>12) vocalHesitationEstimate='High';
   else if(silenceRatio>0.2 || zcrStats.stdDev >6) vocalHesitationEstimate='Moderate';
   else vocalHesitationEstimate='Low';
+  
 
   return{
     frameCount,

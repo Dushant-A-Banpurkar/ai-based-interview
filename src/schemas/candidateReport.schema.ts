@@ -66,4 +66,4 @@ export const CandidateReportSchema = z.object({
     .describe("Topics for human interviewers to probe in the next round."),
 });
 
-export type CandiateReport = z.infer<typeof CandidateReportSchema>;
+export type CandidateReport = z.infer<typeof CandidateReportSchema>;

@@ -3,28 +3,17 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import * as dotenv from "dotenv";
 import {
   CandidateReportSchema,
-  CandiateReport,
+  CandidateReport,
 } from "../schemas/candidateReport.schema";
+import { CodeSubmissionItem, TranscriptItem } from "../queues/meyda.queue";
+import { AggregatedAudioTelemetry } from "../utils/meydaAggregator";
 dotenv.config();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface InterviewDataPayload {
-  transcript: Array<{
-    sender: "ai" | "candiateId";
-    text: string;
-    timestamp: number;
-  }>;
-  codeSubmissions: Array<{
-    language: string;
-    code: string;
-    sandboxResult: any;
-  }>;
-  audioTelemetryAverage: {
-    avgRms: number;
-    rmsVariance: number;
-    avgSpectralCentroid: number;
-    avgZcr: number;
-  };
+  transcript: TranscriptItem[];
+  codeSubmissions:CodeSubmissionItem[];
+  audioTelemetryAverage:AggregatedAudioTelemetry[]|null;
 }
 
 const system_prompt=`
@@ -61,9 +50,9 @@ You will be provided with three data streams from the interview session:
 ### OUTPUT REQUIREMENTS
 Output MUST strictly follow the provided JSON schema. Be objective, precise, and actionable. Avoid generic filler praise.`
 
-export async function generateCandiateReport(
+export async function generateCandidateReport(
   data: InterviewDataPayload,
-): Promise<CandiateReport> {
+): Promise<CandidateReport> {
   const userContent = `
     ### transcript
     ${JSON.stringify(data.transcript, null, 2)}
@@ -78,7 +67,7 @@ export async function generateCandiateReport(
       model:'gpt-4o-2024-08-06',
       messages:[{role:'system',content:system_prompt},{role:'user',content:userContent}],
       temperature:0.2,
-      response_format:zodResponseFormat(CandidateReportSchema,'candiate_report')
+      response_format:zodResponseFormat(CandidateReportSchema,'candidate_report')
     })
     const report:any= chatcompletion.choices[0].message.content;
     if(!report){
