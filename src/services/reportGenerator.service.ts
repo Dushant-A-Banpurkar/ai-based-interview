@@ -5,15 +5,16 @@ import {
   CandidateReportSchema,
   CandidateReport,
 } from "../schemas/candidateReport.schema";
-import { CodeSubmissionItem, TranscriptItem } from "../queues/meyda.queue";
 import { AggregatedAudioTelemetry } from "../utils/meydaAggregator";
+import {  TranscriptItem,CodeSubmissionItem } from "../queues/meyda.queue";
+
 dotenv.config();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface InterviewDataPayload {
   transcript: TranscriptItem[];
   codeSubmissions:CodeSubmissionItem[];
-  audioTelemetryAverage:AggregatedAudioTelemetry[]|null;
+  audioTelemetryAverage:AggregatedAudioTelemetry|null;
 }
 
 const system_prompt=`
@@ -69,9 +70,10 @@ export async function generateCandidateReport(
       temperature:0.2,
       response_format:zodResponseFormat(CandidateReportSchema,'candidate_report')
     })
-    const report:any= chatcompletion.choices[0].message.content;
-    if(!report){
+    const rawContent:any= chatcompletion.choices[0].message.content;
+    if(!rawContent){
       throw new Error('Failed to parse candidate report from OpenAI response.')
     }
+    const report:CandidateReport=JSON.parse(rawContent);
     return report;
 }

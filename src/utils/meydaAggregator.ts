@@ -29,7 +29,7 @@ export interface AggregatedAudioTelemetry {
   };
 }
 
-export function aggregateMeydaTelementry(
+export function aggregateMeydaTelemetry(
   frames: RawMeydaFrame[],
   slienceThresholdRms = 0.015,
 ): AggregatedAudioTelemetry | null {

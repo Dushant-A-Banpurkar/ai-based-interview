@@ -1,5 +1,5 @@
 import {
-  aggregateMeydaTelementry,
+  aggregateMeydaTelemetry,
   AggregatedAudioTelemetry,
   RawMeydaFrame,
 } from "../utils/meydaAggregator";
@@ -49,7 +49,7 @@ export async function processInterviewJob(inteviewId: string) {
   );
   const frames: RawMeydaFrame[] = rawTelementry.map((item) => JSON.parse(item));
 
-  const aggregateTelemetry :AggregatedAudioTelemetry|null=aggregateMeydaTelementry(frames);
+  const aggregateTelemetry :AggregatedAudioTelemetry|null=aggregateMeydaTelemetry(frames);
 
   const transcript = await getInterviewTranscript(inteviewId);
   const codeSubmissions = await getCodeSubmissions(inteviewId);
