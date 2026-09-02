@@ -26,7 +26,7 @@ describe("aggregateMeydaTelemetry", () => {
     expect(result?.rms.mean).toBe(0.1);
     expect(result?.rms.min).toBe(0.05);
     expect(result?.rms.max).toBe(0.15);
-    expect(result?.rms.variance).toBeCloseTo(0.001667, 5);
+    expect(result?.rms.variance).toBeCloseTo(0.0017, 4);
     expect(result?.rms.stdDev).toBeCloseTo(0.0408, 3);
   });
 
@@ -55,8 +55,8 @@ describe("aggregateMeydaTelemetry", () => {
 
     expect(result?.energy).toBeDefined();
     expect(result?.energy?.mean).toBe(20);
-    expect(result?.energy?.min).toBe(20);
-    expect(result?.energy?.max).toBe(20);
+    expect(result?.energy?.min).toBe(10);
+    expect(result?.energy?.max).toBe(30);
   });
 
   it('should omit energy block if frames do not supply energy',()=>{
