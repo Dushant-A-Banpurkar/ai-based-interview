@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IVoiceMetrics extends Document {
+  interviewId:string; 
   rms?: number;
   spectralCentroid?: number;
   zcr?: number;
@@ -9,6 +10,11 @@ export interface IVoiceMetrics extends Document {
 
 const VoiceMetricsSchema: Schema<IVoiceMetrics> = new Schema(
   {
+    interviewId:{
+      type:String,
+      required:true,
+      index:true
+    },
     rms: { type: Number },
     spectralCentroid: { type: Number },
     zcr: { type: Number },
@@ -26,7 +32,7 @@ export const voiceMertricsModel: Model<IVoiceMetrics> =
 
 export interface ICodeSubmission extends Document {
   interviewId: string;
-  languageId?: string;
+  languageId?: number;
   sourceCode?: string;
 }
 
@@ -36,14 +42,7 @@ const CodeSubmissionSchema: Schema<ICodeSubmission> = new Schema(
       type: String,
       required: true,
       trim: true,
-      validate: {
-        validator: function (v: string) {
-          return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
-            v,
-          );
-        },
-        message: (props) => `${props.value} is not a valid UUID!`,
-      },
+      index:true,
     },
     languageId: {
       type: Number,
