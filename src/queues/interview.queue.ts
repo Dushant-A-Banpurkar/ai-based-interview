@@ -15,9 +15,9 @@ const s3 = new S3Client({ region: process.env.AWS_REGION });
 new Worker(
   "interview-processing",
   async (job) => {
-    const { interviewId, candiateId, rawAudioBuffer } = job.data;
+    const { interviewId, candidateId, rawAudioBuffer } = job.data;
 
-    const s3Key = `recording/${candiateId}/${interviewId}.wav`;
+    const s3Key = `recording/${candidateId}/${interviewId}.wav`;
     await s3.send(
       new PutObjectCommand({
         Bucket: process.env.S3_Bucket_NAME,
