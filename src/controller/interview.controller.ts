@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import { extractTextFromArrayBuffer } from "../helper/pdfToText";
 import { InterviewModel } from "../model/interview.model";
 import { CreateInterviewSchema } from "../schemas/interview.schema";
-
+import { interviewReportQueue } from "../queues/interview.queue";
+import {z} from 'zod';
 interface MulterRequest extends Request {
   file?: globalThis.Express.Multer.File;
 }
@@ -99,3 +100,50 @@ export async function createInterviewSession(
     });
   };
 };
+
+const EndInterviewSchema = z.object({
+  interviewId: z.string().regex(/^[0-9a-fA-F]{24}$/, {
+    message: "Invalid interviewId format. Must be a valid 24-character hex string."
+  })
+});
+
+export async function endInterviewSession(req: Request, res: Response) {
+  try {
+
+    const validationResult=EndInterviewSchema.safeParse(req.body);
+    if(!validationResult.success){
+        res.status(400).json({
+            error:'Validation failed',
+            details:validationResult.error.format()
+        });
+        return;
+    }
+    const { interviewId }=validationResult.data;
+
+    const interview=await InterviewModel.findById(interviewId);
+    if(!interview){
+        res.status(404).json({error:'Interview session not found'});
+        return;
+    }
+
+    interview.status='processing';
+    await interview.save();
+
+    await interviewReportQueue.add('generate-report',{
+        interviewId:interview._id.toString(),
+        candiateId:interview.candidateId
+    });
+
+    res.status(200).json({
+        message:'Interview ended. Post-interview processing queued.',
+        interviewId:interview._id,
+        status:'processing',
+    })
+  } catch (error: any) {
+    console.error("Error ib endInterviewSession: ",error.message);
+    res.status(500).json({
+      error: "Failed to end interview session",
+      details: error.message,
+    });
+  }
+}
