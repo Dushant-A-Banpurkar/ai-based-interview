@@ -8,7 +8,7 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const registerInterviewHandlers=async (io: Server, socket: Socket)=> {
+export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   const interviewId = socket.handshake.query.interviewId as string;
   const deepgram = new DeepgramClient({ apiKey: process.env.DEEPGRAM_API_KEY });
   const dgConnection = await deepgram.listen.v1.createConnection({
@@ -18,7 +18,7 @@ const registerInterviewHandlers=async (io: Server, socket: Socket)=> {
     sample_rate: 16000,
   });
 
-  dgConnection.on('message', (data: any) => {
+  dgConnection.on("message", (data: any) => {
     const transcript = data.channel.alternatives[0]?.transcript;
     if (transcript && data.is_final) {
       io.to(interviewId).emit("stt:transcript", { transcript, isFinal: true });
@@ -40,4 +40,4 @@ const registerInterviewHandlers=async (io: Server, socket: Socket)=> {
   socket.on("disconnect", () => {
     dgConnection.close();
   });
-}
+};
