@@ -101,7 +101,7 @@ export async function createInterviewSession(
   };
 };
 
-const EndInterviewSchema = z.object({
+const InterviewIdSchema = z.object({
   interviewId: z.string().regex(/^[0-9a-fA-F]{24}$/, {
     message: "Invalid interviewId format. Must be a valid 24-character hex string."
   })
@@ -110,7 +110,7 @@ const EndInterviewSchema = z.object({
 export async function endInterviewSession(req: Request, res: Response) {
   try {
 
-    const validationResult=EndInterviewSchema.safeParse(req.body);
+    const validationResult=InterviewIdSchema.safeParse(req.body);
     if(!validationResult.success){
         res.status(400).json({
             error:'Validation failed',
@@ -140,10 +140,40 @@ export async function endInterviewSession(req: Request, res: Response) {
         status:'processing',
     })
   } catch (error: any) {
-    console.error("Error ib endInterviewSession: ",error.message);
+    console.error("Error in endInterviewSession: ",error.message);
     res.status(500).json({
       error: "Failed to end interview session",
       details: error.message,
     });
+  }
+}
+
+export async function getInterviewStatus(req:Request,res:Response):Promise<void>{
+  try{
+    const validationResult=InterviewIdSchema.safeParse(req.params);
+    if(!validationResult.success){
+        res.status(400).json({
+            error:'Validation failed',
+            details:validationResult.error.format()
+        });
+        return;
+    }
+    const {interviewId}=validationResult.data;
+
+    const interview=await InterviewModel.findById(interviewId,'status roleTitle createdAt');
+    if(!interview){
+      res.status(404).json({error:'Interview session not found.'});
+      return;
+    }
+
+    res.status(200).json({
+      message:"Successfully fetch interview status",
+      interviewId:interview._id,
+      status:interview.status,
+    })
+  }
+  catch(error:any){
+    console.error("Error in getInterviewStatus: ",error.message);
+    res.status(500).json({error:'Failed to fetch status',details:error.message})
   }
 }
