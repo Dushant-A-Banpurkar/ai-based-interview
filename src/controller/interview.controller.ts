@@ -4,6 +4,7 @@ import { InterviewModel } from "../model/interview.model";
 import { CreateInterviewSchema } from "../schemas/interview.schema";
 import { interviewReportQueue } from "../queues/interview.queue";
 import {z} from 'zod';
+import { CandiateReportModel } from "../model/candiateReport.model";
 interface MulterRequest extends Request {
   file?: globalThis.Express.Multer.File;
 }
@@ -175,5 +176,31 @@ export async function getInterviewStatus(req:Request,res:Response):Promise<void>
   catch(error:any){
     console.error("Error in getInterviewStatus: ",error.message);
     res.status(500).json({error:'Failed to fetch status',details:error.message})
+  }
+}
+
+export async function getInterviewReport(req:Request,res:Response):Promise<void> {
+  try{
+    const validationResult=InterviewIdSchema.safeParse(req.params);
+    if(!validationResult.success){
+        res.status(400).json({
+            error:'Validation failed',
+            details:validationResult.error.format()
+        });
+        return;
+    }
+    const {interviewId}=validationResult.data;
+
+    const report=await CandiateReportModel.findOne({interviewId});
+    if(!report){
+      res.status(404).json({error:'Report not found or processing is still in progress.'});
+      return;
+    }
+
+    res.status(200).json({report});
+  }
+  catch(error:any){
+    console.error("Error in getInterviewReport",error.message);
+    res.status(500).json({error:'Failed to retrieve report',details:error.message});
   }
 }
