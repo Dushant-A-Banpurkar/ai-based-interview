@@ -2,14 +2,27 @@ import mongoose from "mongoose";
 import * as dotenv from "dotenv";
 
 dotenv.config();
-
-const connectMongoDB = async () => {
+const mongodbURI:any=process.env.MONGODB_URI;
+const connectMongoDB = async ():Promise<void> => {
   try {
-    if (!process.env.MONGODB_URI) {
+    if (!mongodbURI) {
       console.log("mongodburi");
       throw new Error("MONGODB_URI is missing from environment variable");
     }
-    const connect = await mongoose.connect(process.env.MONGODB_URI, {
+
+    mongoose.connection.on("connected", () => {
+      console.log("MongoDB event: connected");
+    });
+
+    mongoose.connection.on("error", (error: any) => {
+      console.error("MongoDB event: connection error: ", error.message);
+    });
+
+    mongoose.connection.on("disconnected", () => {
+      console.warn("MongoDB event: Disconnected from database.");
+    });
+
+    const connect = await mongoose.connect(mongodbURI, {
       maxPoolSize: 10,
       minPoolSize: 1,
       serverSelectionTimeoutMS: 30000,
@@ -18,18 +31,6 @@ const connectMongoDB = async () => {
     });
 
     console.log(`MongoDb Connected: ${connect.connection.host}`);
-
-    mongoose.connection.on("Connected", () => {
-      console.log("MongoDB event: connected");
-    });
-
-    mongoose.connection.on("Error", (error: any) => {
-      console.error("MongoDB event: connection error: ", error.message);
-    });
-
-    mongoose.connection.on("Warning", () => {
-      console.warn("MongoDB event: Disconnected");
-    });
 
     process.on("SIGINT", async () => {
       await mongoose.connection.close();
