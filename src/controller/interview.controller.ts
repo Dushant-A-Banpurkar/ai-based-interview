@@ -107,7 +107,7 @@ const InterviewIdSchema = z.object({
   })
 });
 
-export async function endInterviewSession(req: Request, res: Response) {
+export async function endInterviewSession(req: Request, res: Response):Promise<void> {
   try {
 
     const validationResult=InterviewIdSchema.safeParse(req.body);
