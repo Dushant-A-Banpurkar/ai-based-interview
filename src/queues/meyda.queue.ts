@@ -6,6 +6,8 @@ import {
 import { generateCandidateReport } from "../services/reportGenerator.service";
 import Redis from "ioredis";
 import * as dotenv from "dotenv";
+import { CandidateReportModel } from "../model/candidateReport.model";
+import { InterviewModel } from "../model/interview.model";
 
 dotenv.config();
 
@@ -38,31 +40,43 @@ async function getInterviewTranscript(
 async function getCodeSubmissions(
   interviewId: string,
 ): Promise<CodeSubmissionItem[]> {
-  const rawList = await redis.lrange(`interview:${interviewId}:code`, 0, -1);
-  return rawList.map((item) => JSON.parse(item));
-}
-export async function processInterviewJob(inteviewId: string) {
-  const rawTelementry = await redis.lrange(
-    `inteview:${inteviewId}:telementry`,
+  const rawList = await redis.lrange(
+    `interview:${interviewId}:transcript`,
     0,
     -1,
   );
-  const frames: RawMeydaFrame[] = rawTelementry.map((item) => JSON.parse(item));
+  return rawList.map((item) => JSON.parse(item));
+}
+export async function processInterviewJob(interviewId: string) {
+  const rawTelemetry = await redis.lrange(
+    `interview:${interviewId}:telemetry`,
+    0,
+    -1,
+  );
+  const frames: RawMeydaFrame[] = rawTelemetry.map((item) => JSON.parse(item));
 
-  const aggregateTelemetry :AggregatedAudioTelemetry|null=aggregateMeydaTelemetry(frames);
+  const aggregateTelemetry: AggregatedAudioTelemetry | null =
+    aggregateMeydaTelemetry(frames);
 
-  const transcript = await getInterviewTranscript(inteviewId);
-  const codeSubmissions = await getCodeSubmissions(inteviewId);
+  const transcript = await getInterviewTranscript(interviewId);
+  const codeSubmissions = await getCodeSubmissions(interviewId);
   const reportPayload = {
     transcript,
     codeSubmissions,
     audioTelemetryAverage: aggregateTelemetry,
   };
-  const report = await generateCandidateReport(reportPayload);
+  const reportData = await generateCandidateReport(reportPayload);
+
+  await CandidateReportModel.create({
+    interviewId,
+    ...reportData,
+  });
+
+  await InterviewModel.findByIdAndUpdate(interviewId, { status: "completed" });
   await redis.del(
-    `interview:${inteviewId}:telementry`,
-    `interview:${inteviewId}:transcript`,
-    `interview:${inteviewId}:code`,
+    `interview:${interviewId}:telemetry`,
+    `interview:${interviewId}:transcript`,
+    `interview:${interviewId}:code`,
   );
-  return report;
+  return reportData;
 }
