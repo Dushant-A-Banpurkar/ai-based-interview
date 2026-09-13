@@ -3,8 +3,8 @@ import { extractTextFromArrayBuffer } from "../helper/pdfToText";
 import { InterviewModel } from "../model/interview.model";
 import { CreateInterviewSchema } from "../schemas/interview.schema";
 import { interviewReportQueue } from "../queues/interview.queue";
-import {z} from 'zod';
-import { CandiateReportModel } from "../model/candiateReport.model";
+import { z } from "zod";
+import { CandidateReportModel } from "../model/candidateReport.model";
 interface MulterRequest extends Request {
   file?: globalThis.Express.Multer.File;
 }
@@ -99,49 +99,52 @@ export async function createInterviewSession(
       error: "Failed to create interview session",
       details: error.message,
     });
-  };
-};
+  }
+}
 
 const InterviewIdSchema = z.object({
   interviewId: z.string().regex(/^[0-9a-fA-F]{24}$/, {
-    message: "Invalid interviewId format. Must be a valid 24-character hex string."
-  })
+    message:
+      "Invalid interviewId format. Must be a valid 24-character hex string.",
+  }),
 });
 
-export async function endInterviewSession(req: Request, res: Response):Promise<void> {
+export async function endInterviewSession(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
-
-    const validationResult=InterviewIdSchema.safeParse(req.body);
-    if(!validationResult.success){
-        res.status(400).json({
-            error:'Validation failed',
-            details:validationResult.error.format()
-        });
-        return;
+    const validationResult = InterviewIdSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.format(),
+      });
+      return;
     }
-    const { interviewId }=validationResult.data;
+    const { interviewId } = validationResult.data;
 
-    const interview=await InterviewModel.findById(interviewId);
-    if(!interview){
-        res.status(404).json({error:'Interview session not found'});
-        return;
+    const interview = await InterviewModel.findById(interviewId);
+    if (!interview) {
+      res.status(404).json({ error: "Interview session not found" });
+      return;
     }
 
-    interview.status='processing';
+    interview.status = "processing";
     await interview.save();
 
-    await interviewReportQueue.add('generate-report',{
-        interviewId:interview._id.toString(),
-        candiateId:interview.candidateId
+    await interviewReportQueue.add("generate-report", {
+      interviewId: interview._id.toString(),
+      candiateId: interview.candidateId,
     });
 
     res.status(200).json({
-        message:'Interview ended. Post-interview processing queued.',
-        interviewId:interview._id,
-        status:'processing',
-    })
+      message: "Interview ended. Post-interview processing queued.",
+      interviewId: interview._id,
+      status: "processing",
+    });
   } catch (error: any) {
-    console.error("Error in endInterviewSession: ",error.message);
+    console.error("Error in endInterviewSession: ", error.message);
     res.status(500).json({
       error: "Failed to end interview session",
       details: error.message,
@@ -149,58 +152,73 @@ export async function endInterviewSession(req: Request, res: Response):Promise<v
   }
 }
 
-export async function getInterviewStatus(req:Request,res:Response):Promise<void>{
-  try{
-    const validationResult=InterviewIdSchema.safeParse(req.params);
-    if(!validationResult.success){
-        res.status(400).json({
-            error:'Validation failed',
-            details:validationResult.error.format()
-        });
-        return;
+export async function getInterviewStatus(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const validationResult = InterviewIdSchema.safeParse(req.params);
+    if (!validationResult.success) {
+      res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.format(),
+      });
+      return;
     }
-    const {interviewId}=validationResult.data;
+    const { interviewId } = validationResult.data;
 
-    const interview=await InterviewModel.findById(interviewId,'status roleTitle createdAt');
-    if(!interview){
-      res.status(404).json({error:'Interview session not found.'});
+    const interview = await InterviewModel.findById(
+      interviewId,
+      "status roleTitle createdAt",
+    );
+    if (!interview) {
+      res.status(404).json({ error: "Interview session not found." });
       return;
     }
 
     res.status(200).json({
-      message:"Successfully fetch interview status",
-      interviewId:interview._id,
-      status:interview.status,
-    })
-  }
-  catch(error:any){
-    console.error("Error in getInterviewStatus: ",error.message);
-    res.status(500).json({error:'Failed to fetch status',details:error.message})
+      message: "Successfully fetch interview status",
+      interviewId: interview._id,
+      status: interview.status,
+    });
+  } catch (error: any) {
+    console.error("Error in getInterviewStatus: ", error.message);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch status", details: error.message });
   }
 }
 
-export async function getInterviewReport(req:Request,res:Response):Promise<void> {
-  try{
-    const validationResult=InterviewIdSchema.safeParse(req.params);
-    if(!validationResult.success){
-        res.status(400).json({
-            error:'Validation failed',
-            details:validationResult.error.format()
-        });
-        return;
+export async function getInterviewReport(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const validationResult = InterviewIdSchema.safeParse(req.params);
+    if (!validationResult.success) {
+      res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.format(),
+      });
+      return;
     }
-    const {interviewId}=validationResult.data;
+    const { interviewId } = validationResult.data;
 
-    const report=await CandiateReportModel.findOne({interviewId});
-    if(!report){
-      res.status(404).json({error:'Report not found or processing is still in progress.'});
+    const report = await CandidateReportModel.findOne({ interviewId });
+    if (!report) {
+      res
+        .status(404)
+        .json({
+          error: "Report not found or processing is still in progress.",
+        });
       return;
     }
 
-    res.status(200).json({report});
-  }
-  catch(error:any){
-    console.error("Error in getInterviewReport",error.message);
-    res.status(500).json({error:'Failed to retrieve report',details:error.message});
+    res.status(200).json({ report });
+  } catch (error: any) {
+    console.error("Error in getInterviewReport", error.message);
+    res
+      .status(500)
+      .json({ error: "Failed to retrieve report", details: error.message });
   }
 }
