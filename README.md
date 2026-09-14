@@ -22,6 +22,7 @@ Frontend Architecture:
  ### Backend: Node, JavaScript, LLM, Exprees, RestAPI and socket.io
  ### Database: Mongodb Atlas and Redis
  ### Tools: Docker and Postman
+ ### Testing Framework: Vitest
 
  
 
