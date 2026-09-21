@@ -3,7 +3,8 @@
 import {Provider as ReduxProvider} from 'react-redux';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {useState} from 'react';
-import {store} from '@store/store'
+import { store } from '../store/store';
+
 
 
 export default function Providers({children}:{children:React.ReactNode}){
