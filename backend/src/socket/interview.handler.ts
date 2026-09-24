@@ -2,11 +2,13 @@ import { Socket, Server } from "socket.io";
 import { DeepgramClient } from "@deepgram/sdk";
 import {
   VoiceMetricsSchema,
-  CodeSubmissionSchema,
 } from "../schemas/interviewSocket.schema";
 import * as dotenv from "dotenv";
+import Redis from "ioredis";
 
 dotenv.config();
+
+const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
 export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   const interviewId = socket.handshake.query.interviewId as string;
@@ -36,6 +38,14 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
     if (!parse.success) return;
     const metrics = parse.data;
   });
+
+  socket.on('meyda_telemetry', async (data) => {
+  const { interviewId } = socket.handshake.query;
+  if (!interviewId) return;
+
+  await redis.rpush(`interview:${interviewId}:telemetry`, JSON.stringify(data));
+  await redis.expire(`interview:${interviewId}:telemetry`, 86400);
+});
 
   socket.on("disconnect", () => {
     dgConnection.close();
