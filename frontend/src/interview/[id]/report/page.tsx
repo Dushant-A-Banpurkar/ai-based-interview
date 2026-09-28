@@ -1,29 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
+import { useInterviewReport } from "@/src/hooks/useInterviewReport";
 import { useParams } from "next/navigation";
-
-const fetchReport = async (interviewId: string) => {
-  const { data } = await axios.get(`/api/interviews/${interviewId}/report`);
-  return data.report;
-};
 
 export default function ReportDashboard() {
   const params = useParams();
   const interviewId = params.id as string;
 
-  const {
-    data: report,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ["interviewId", interviewId],
-    queryFn: () => fetchReport(interviewId),
-    staleTime: Infinity,
-    retry: 2,
-  });
+  const { data: report, isLoading, isError } = useInterviewReport(interviewId);
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
