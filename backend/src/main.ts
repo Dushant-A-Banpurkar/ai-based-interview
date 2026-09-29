@@ -12,7 +12,7 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: [
-      "http://localhost:4000",
+      "http://localhost:3000",
       "https://ai-based-job-tracker-frontend.vercel.app",
       "https://ai-based-job-tracker-frontend-gkhw3me4r.vercel.app/",
     ],
