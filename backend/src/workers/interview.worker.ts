@@ -6,7 +6,14 @@ import { Job, Worker } from "bullmq";
 
 dotenv.config();
 
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+const redisClient = new Redis(
+  process.env.REDIS_URL || "redis://localhost:6379",
+  { maxRetriesPerRequest: null },
+);
+const bullmqRedisClient = new Redis(
+  process.env.REDIS_URL || "redis://localhost:6379",
+  { maxRetriesPerRequest: null },
+);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface RawMeydaFrame {
@@ -51,9 +58,9 @@ export async function processInterviewJob(interviewId: string) {
   );
 
   const [rawTelemetry, rawTranscript, rawCode] = await Promise.all([
-    redis.lrange(`interview:${interviewId}:telemetry`, 0, -1),
-    redis.lrange(`interview:${interviewId}:transcript`, 0, -1),
-    redis.lrange(`interview:${interviewId}:code`, 0, -1),
+    redisClient.lrange(`interview:${interviewId}:telemetry`, 0, -1),
+    redisClient.lrange(`interview:${interviewId}:transcript`, 0, -1),
+    redisClient.lrange(`interview:${interviewId}:code`, 0, -1),
   ]);
 
   const frames: RawMeydaFrame[] = rawTelemetry.map((item) => JSON.parse(item));
@@ -131,7 +138,7 @@ export const interviewWorker = new Worker(
     return await processInterviewJob(job.data.interviewId);
   },
   {
-    connection: redis,
+    connection: bullmqRedisClient,
     concurrency: 5,
   },
 );
