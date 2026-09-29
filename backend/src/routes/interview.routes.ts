@@ -4,11 +4,12 @@ import { uploadMemory } from '../middlewares/uploadMemory';
 
 const router=Router();
 
-router.post('/createinterviewsession',uploadMemory.single("pdf"),createInterviewSession);
+router.post('/createinterviewsession', uploadMemory.single("pdf"), createInterviewSession);
+
 
 router.post('/:interviewId/end',endInterviewSession);
 
-router.get('/:interview/status',getInterviewStatus);
+router.get('/:interviewId/status', getInterviewStatus);
 
 router.get('/:interviewId/report',getInterviewReport);
 
