@@ -22,7 +22,7 @@ export const CandidateReportSchema = z.object({
   technicalEvaluation: z.object({
     score: z.number().min(1).max(100),
     problemSolvingScore: z.number().min(1).max(10),
-    codeQualtiyScore: z.number().min(1).max(10),
+    codeQualityScore: z.number().min(1).max(10),
     correctnessScore: z.number().min(1).max(10),
     codeAnalysis: z
       .string()
