@@ -114,7 +114,7 @@ export async function endInterviewSession(
   res: Response,
 ): Promise<void> {
   try {
-    const validationResult = InterviewIdSchema.safeParse(req.body);
+    const validationResult = InterviewIdSchema.safeParse(req.params);
     if (!validationResult.success) {
       res.status(400).json({
         error: "Validation failed",
@@ -135,7 +135,7 @@ export async function endInterviewSession(
 
     await interviewReportQueue.add("generate-report", {
       interviewId: interview._id.toString(),
-      candiateId: interview.candidateId,
+      candidateId: interview.candidateId,
     });
 
     res.status(200).json({
@@ -206,11 +206,9 @@ export async function getInterviewReport(
 
     const report = await CandidateReportModel.findOne({ interviewId });
     if (!report) {
-      res
-        .status(404)
-        .json({
-          error: "Report not found or processing is still in progress.",
-        });
+      res.status(404).json({
+        error: "Report not found or processing is still in progress.",
+      });
       return;
     }
 
