@@ -7,14 +7,13 @@ export interface ICandidateReport extends Document {
   recommendation:
     | "Strong Hire"
     | "Hire"
-    | "Lean Hire"
-    | "Lean Reject"
-    | "Reject";
+    | "No Hire"
+    | "Strong Reject";
 
   technicalEvaluation?: {
     score: number;
     problemSolvingScore: number;
-    codeQualtiyScore: number;
+    codeQualityScore: number;
     correctnessScore: number;
     codeAnalysis: string;
     strengths: string[];
@@ -58,7 +57,7 @@ const CandidateReportSchema = new Schema(
     recommendation: {
       type: String,
       enum: {
-        values: ["Strong Hire", "Hire", "Lean Hire", "Lean Reject", "Reject"],
+        values: ["Strong Hire", "Hire", "No Hire", "Strong Reject"],
         message: "{VALUE} is not a valid recommendation option",
       },
       required: true,
@@ -68,7 +67,7 @@ const CandidateReportSchema = new Schema(
       type: {
         score: { type: Number, min: 1, max: 100 },
         problemSolvingScore: { type: Number, min: 1, max: 10 },
-        codeQualtiyScore: { type: Number, min: 1, max: 10 },
+        codeQualityScore: { type: Number, min: 1, max: 10 },
         correctnessScore: { type: Number, min: 1, max: 10 },
 
         codeAnalysis: { type: String, trim: true },
@@ -113,4 +112,4 @@ const CandidateReportSchema = new Schema(
 
 export const CandidateReportModel: Model<ICandidateReport> =
   mongoose.models.CandiateReport ||
-  mongoose.model<ICandidateReport>("CandiateReport", CandidateReportSchema);
+  mongoose.model<ICandidateReport>("CandidateReport", CandidateReportSchema);
