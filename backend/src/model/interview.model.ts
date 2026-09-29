@@ -55,6 +55,7 @@ const InterviewSchema: Schema<IInterview> = new Schema(
     status: {
       type: String,
       enum: ["scheduled", "live", "processing", "completed"],
+      default: "scheduled",
       index: true,
     },
   },
@@ -64,7 +65,9 @@ const InterviewSchema: Schema<IInterview> = new Schema(
   },
 );
 
-export const InterviewModel:Model<IInterview>=mongoose.models.Interview || mongoose.model<IInterview>("Interview",InterviewSchema)
+export const InterviewModel: Model<IInterview> =
+  mongoose.models.Interview ||
+  mongoose.model<IInterview>("Interview", InterviewSchema);
 
 export interface IVoiceMetrics extends Document {
   interviewId: string;
@@ -92,7 +95,7 @@ const VoiceMetricsSchema: Schema<IVoiceMetrics> = new Schema(
   },
 );
 
-export const voiceMertricsModel: Model<IVoiceMetrics> =
+export const voiceMetricsModel: Model<IVoiceMetrics> =
   mongoose.models.VoiceMetrics ||
   mongoose.model<IVoiceMetrics>("VoiceMetrics", VoiceMetricsSchema);
 
