@@ -24,7 +24,7 @@ interface AuthUserResponse {
 }
 const signin = async (data: LoginForm): Promise<AuthUserResponse> => {
   const url = process.env.NEXT_PUBLIC_BACKEND_API;
-  const res = await fetch(`${url}/api/auth/signin`, {
+  const res = await fetch(`/api/auth/signin`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
