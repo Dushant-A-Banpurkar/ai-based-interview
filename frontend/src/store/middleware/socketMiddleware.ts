@@ -5,6 +5,7 @@ import {
   setConnectionStatus,
   setPhase,
   updateMediaTicks,
+  updateSandboxOutput,
 } from "../slices/interviewSlice";
 
 export const socketMiddleware: Middleware = (store) => {
@@ -17,6 +18,7 @@ export const socketMiddleware: Middleware = (store) => {
         socket.off("disconnect");
         socket.off("phase_change");
         socket.off("meyda_tick");
+        socket.off("sandbox_result");
         socket.disconnect();
         socket = null;
       }
@@ -63,10 +65,7 @@ export const socketMiddleware: Middleware = (store) => {
           stderr: string | null;
           error?: string;
         }) => {
-          store.dispatch({
-            type: "interview/updateSandboxOutput",
-            payload: result,
-          });
+          store.dispatch(updateSandboxOutput(result));
         },
       );
     }
@@ -76,6 +75,7 @@ export const socketMiddleware: Middleware = (store) => {
       socket.off("disconnect");
       socket.off("phase_change");
       socket.off("meyda_tick");
+      socket.off("sandbox_result");
       socket.disconnect();
       socket = null;
     }
