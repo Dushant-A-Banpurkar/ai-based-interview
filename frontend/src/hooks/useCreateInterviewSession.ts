@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setTargetSession } from "../store/slices/interviewSlice";
 import { toast } from "sonner";
@@ -32,9 +32,9 @@ const createInterviewSession = async (payload: CreateInterviewPayload) => {
     JSON.stringify(payload.allowedLanguages || ["javascript", "python", "cpp"]),
   );
   if (payload.resumeText) {
-    formData.append("file", payload.resumeText);
+    formData.append("pdf", payload.resumeText);
   }
-  const res = await fetch(`${baseUrl}/api/createinterviewsession`, {
+  const res = await fetch(`${baseUrl}/api/interviews/createinterviewsession`, {
     method: "POST",
     body: formData,
   });
@@ -54,20 +54,20 @@ export const useCreateInterviewSession = () => {
   return useMutation({
     mutationFn: createInterviewSession,
     onError: (error: any) => {
-        toast.error(error.message || "Failed to create interview session");
-      throw new Error(error.message || "Failed to create interview session.");
+      toast.error(error.message || "Failed to create interview session");
     },
     onSuccess: (responseData) => {
       const interviewId = responseData.interviewId;
-      dispatch(setTargetSession({ interviewId: responseData.interviewId }));
-      dispatch({
-        type: "socket/emit",
-        payload: {
-          event: "join_interview_room",
-          data: { interviewId },
-        },
-      });
+      dispatch(setTargetSession({ interviewId }));
+      // dispatch({
+      //   type: "socket/emit",
+      //   payload: {
+      //     event: "join_interview_room",
+      //     data: { interviewId },
+      //   },
+      // });
       queryClient.invalidateQueries({ queryKey: ["interviews"] });
+      toast.success("Interview session created successfully!");
       router.push(`/interview/${interviewId}/setup`);
     },
   });
