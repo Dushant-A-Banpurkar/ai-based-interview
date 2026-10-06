@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setTargetSession } from "../store/slices/interviewSlice";
 import { toast } from "sonner";
+import { useAuthUser } from "./authMe";
 
 interface CreateInterviewPayload {
   candidateId: string;
@@ -18,7 +19,7 @@ interface CreateInterviewPayload {
 }
 
 const createInterviewSession = async (payload: CreateInterviewPayload) => {
-  const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:6000";
+  const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
   const formData = new FormData();
   formData.append("candidateId", payload.candidateId);
   formData.append("roleTitle", payload.roleTitle);
@@ -36,12 +37,22 @@ const createInterviewSession = async (payload: CreateInterviewPayload) => {
   }
   const res = await fetch(`${baseUrl}/api/interviews/createinterviewsession`, {
     method: "POST",
+    credentials: "include",
     body: formData,
+    
   });
 
   if (!res.ok) {
-    const errData = await res.json();
-    throw new Error(errData.error || "Failed to initiate session setup.");
+    const errorText = await res.text();
+    let errorMessage = "Failed to initiate session setup.";
+    try {
+      const errData = JSON.parse(errorText);
+      errorMessage = errData.error || errorMessage;
+    } catch {
+      console.error("Backend returned non-JSON error:", errorText);
+      errorMessage = `Server Error: ${res.status} - Check backend console.`;
+    }
+    throw new Error(errorMessage);
   }
   return res.json();
 };
@@ -59,13 +70,6 @@ export const useCreateInterviewSession = () => {
     onSuccess: (responseData) => {
       const interviewId = responseData.interviewId;
       dispatch(setTargetSession({ interviewId }));
-      // dispatch({
-      //   type: "socket/emit",
-      //   payload: {
-      //     event: "join_interview_room",
-      //     data: { interviewId },
-      //   },
-      // });
       queryClient.invalidateQueries({ queryKey: ["interviews"] });
       toast.success("Interview session created successfully!");
       router.push(`/interview/${interviewId}/setup`);
