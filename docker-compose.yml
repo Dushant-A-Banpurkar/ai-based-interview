@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5001:5000"
+    env_file:
+      - ./backend/.env
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      # redis://default:JJDeyk2ihfwmY3hUGtnlmH0FMZ4GjiPB@://redislabs.com
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3001:3000"
+    environment:
+      NEXT_PUBLIC_BACKEND_API: http://localhost:5001
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:5001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
