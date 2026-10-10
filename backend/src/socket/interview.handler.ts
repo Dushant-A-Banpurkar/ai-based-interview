@@ -7,7 +7,7 @@ import axios from "axios";
 
 dotenv.config();
 
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+const redis = new Redis(process.env.REDIS_URL!);
 const JUDGE0_API_URL = process.env.JUDGE0_URL || "http://localhost:2358";
 const JUDGE0_LANGUAGE_MAP: Record<string, number> = {
   javascript: 63,
