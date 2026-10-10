@@ -14,9 +14,8 @@ export const CandidateReportSchema = z.object({
   recommendation: z.enum([
     "Strong Hire",
     "Hire",
-    "Lean Hire",
-    "Lean Reject",
-    "Reject",
+    "No Hire",
+    "Strong Reject"
   ]),
 
   technicalEvaluation: z.object({
