@@ -7,11 +7,11 @@ import { Job, Worker } from "bullmq";
 dotenv.config();
 
 const redisClient = new Redis(
-  process.env.REDIS_URL || "redis://localhost:6379",
+  process.env.REDIS_URL!,
   { maxRetriesPerRequest: null },
 );
 const bullmqRedisClient = new Redis(
-  process.env.REDIS_URL || "redis://localhost:6379",
+  process.env.REDIS_URL!,
   { maxRetriesPerRequest: null },
 );
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
