@@ -4,7 +4,12 @@ import Redis from "ioredis";
 import * as dotenv from "dotenv";
 dotenv.config();
 const connection = new Redis(process.env.REDIS_URL!, {
-  maxRetriesPerRequest: null,
+  retryStrategy(times) {
+    const delay = Math.min(times * 100, 3000);
+    return delay;
+  },
+  maxRetriesPerRequest: null, // Required if using BullMQ or state workers
+  enableReadyCheck: false,
 });
 export const interviewReportQueue = new Queue("interview-process", {
   connection,
