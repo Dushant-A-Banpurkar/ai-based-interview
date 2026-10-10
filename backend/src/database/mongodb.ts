@@ -25,7 +25,7 @@ const connectMongoDB = async ():Promise<void> => {
     const connect = await mongoose.connect(mongodbURI, {
       maxPoolSize: 10,
       minPoolSize: 1,
-      serverSelectionTimeoutMS: 30000,
+      serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       family: 4,
     });
