@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/immutability */
 "use client";
 
 import { useCreateInterviewSession } from "@/src/hooks/useCreateInterviewSession";
@@ -8,7 +7,7 @@ import { useAuthUser } from "@/src/hooks/authMe";
 import Cookies from "js-cookie";
 
 export default function StartNewInterviewPage() {
-  let { data: user } = useAuthUser();
+  const { data: user } = useAuthUser();
   const { mutate: createSession, isPending } = useCreateInterviewSession();
 
   const [formData, setFormData] = useState({
@@ -22,11 +21,6 @@ export default function StartNewInterviewPage() {
 
   const [resumeText, setResumeFile] = useState<File | null>(null);
 
-  const authUserCookie = Cookies.get("user_session");
-  if (!authUserCookie) {
-    toast.error("Cookies expired or user not found. Please log in again.");
-    return;
-  }
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -51,24 +45,27 @@ export default function StartNewInterviewPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 2. Validate against the TanStack Query user data instead of cookies
-    if (!user) {
+    // Safely check for user from TanStack query or fallback cookie inside the event handler
+    let candidateId = user?._id || user?.id || user?.candidateId;
+
+    if (!candidateId) {
+      const authUserCookie = Cookies.get("user_session");
+      if (!authUserCookie) {
+        toast.error("Session expired or user not found. Please log in again.");
+        return;
+      }
       try {
         const authUser = JSON.parse(authUserCookie);
-        // FIXED: Resilient fallback to read candidateId across all possible auth structures
-        user =
+        candidateId =
           authUser.candidateId ||
           authUser.user?.id ||
           authUser.user?._id ||
           authUser.id ||
           authUser._id;
       } catch {
-        user = authUserCookie;
+        candidateId = authUserCookie;
       }
     }
-
-    // 3. Safely extract the ID based on your user object structure
-    const candidateId = user._id || user.id || user.candidateId;
 
     if (!candidateId) {
       toast.error("Could not find a valid candidateId in your session.");
