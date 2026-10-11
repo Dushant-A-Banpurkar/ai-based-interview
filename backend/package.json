@@ -2,11 +2,12 @@
   "name": "ai-based-interview",
   "version": "1.0.0",
   "description": "This is a AI interviewer, which takes interview of person and help them to prepare.",
-  "main": "main.ts",
+  "main": "dist/main.js",
   "module": "",
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
+    "start": "node dist/main.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
