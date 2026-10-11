@@ -13,6 +13,7 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 const redis = new Redis(process.env.REDIS_URL!);
+
 // console.log(redis);
 // redis.on("connect", async () => {
 //   try {
@@ -27,14 +28,13 @@ const redis = new Redis(process.env.REDIS_URL!);
 // });
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://ai-based-job-tracker-frontend.vercel.app",
-  "https://ai-based-job-tracker-frontend-gkhw3me4r.vercel.app",
+  "https://ai-based-interview-pi.vercel.app/",
+  "https://ai-based-interview-git-main-dushant-banpurkar-s-projects.vercel.app",
 ];
 
 // Unified CORS options for Express & Socket.IO
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow server-to-server requests or matching origins (handling optional trailing slashes)
     if (!origin || allowedOrigins.some((o) => origin.startsWith(o))) {
       callback(null, true);
     } else {
@@ -75,6 +75,18 @@ async function startServer() {
     httpServer.listen(PORT, () => {
       console.log(`AI Interview Backend running on port ${PORT}`);
     });
+    const renderUrl = process.env.render!;
+    setInterval(
+    async () => {
+      try {
+        const response = await fetch(renderUrl!);
+        console.log(`Keep-alive ping successful: ${response.status}`);
+      } catch (error:any) {
+        console.error(`Keep-alive ping failed:`, error.message);
+      }
+    },
+    14 * 60 * 1000,
+  );
   } catch (error: any) {
     console.error("Failed to initialize backend server: ", error.message);
   }
