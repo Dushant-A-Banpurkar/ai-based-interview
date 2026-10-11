@@ -6,15 +6,18 @@ import { Job, Worker } from "bullmq";
 
 dotenv.config();
 
-const redisClient = new Redis(
-  process.env.REDIS_URL!,
-  { maxRetriesPerRequest: null },
-);
-const bullmqRedisClient = new Redis(
-  process.env.REDIS_URL!,
-  { maxRetriesPerRequest: null },
-);
+const redisClient = new Redis(process.env.REDIS_URL!, {
+  maxRetriesPerRequest: null,
+});
+const bullmqRedisClient = new Redis(process.env.REDIS_URL!, {
+  maxRetriesPerRequest: null,
+});
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export const gemini = new OpenAI({
+  baseURL: process.env.GEMINI_BASE_URL,
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 interface RawMeydaFrame {
   rms: number;
@@ -103,19 +106,33 @@ Return a JSON object conforming strictly to this structure:
   ]
 }
 `;
+  let parsedReport;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
-  });
-
-  const parsedReport = JSON.parse(
-    completion.choices[0].message.content || "{}",
-  );
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+    parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
+  } catch (openaiError: any) {
+    console.warn(
+      `[Worker] OpenAI failed (${openaiError.message}). Switching to Gemini for interview report...`,
+    );
+    const completion = await gemini.chat.completions.create({
+      model: "gemini-2.5-flash-lite",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+    });
+    parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
+  }
 
   const savedReport = await CandidateReportModel.create({
     interviewId,
