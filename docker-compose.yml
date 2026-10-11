@@ -1,27 +1,46 @@
+version: '3.8'
+
 services:
+  redis:
+    image: redis:alpine
+    container_name: ai_interview_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory-policy noeviction --tcp-keepalive 60
+    restart: always
+    volumes:
+      - redis_data:/data
+
   backend:
     build: ./backend
     ports:
-      - "5001:5000"
+      - "5000:5000"
     env_file:
       - ./backend/.env
     environment:
-      REDIS_URL: ${REDIS_URL}
-      # redis://default:JJDeyk2ihfwmY3hUGtnlmH0FMZ4GjiPB@://redislabs.com
+      - PORT=5000
+      - REDIS_URL=redis://redis:6379
     volumes:
       - ./backend:/app
       - /app/node_modules
+    depends_on:
+      - redis
+    restart: always
 
   frontend:
     build: ./frontend
     ports:
-      - "3001:3000"
+      - "3000:3000"
     environment:
-      NEXT_PUBLIC_BACKEND_API: http://localhost:5001
-      NEXT_PUBLIC_SOCKET_URL: http://localhost:5001
+      - NEXT_PUBLIC_BACKEND_API=http://localhost:5000
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     depends_on:
       - backend
+      - redis
+
+volumes:
+  redis_data:
