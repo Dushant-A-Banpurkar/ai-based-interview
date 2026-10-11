@@ -132,13 +132,13 @@ npm run dev
 
 The backend listens on `http://localhost:6000` by default. Its health endpoint is `http://localhost:6000/health`. The frontend uses the Next.js development-server default, usually `http://localhost:3000`.
 
-Background processing is implemented separately from the API server. To start the report worker from the backend directory:
+Background processing runs in a separate process. Keep the API server running in one terminal, then start the report worker from the backend directory in another:
 
 ```sh
 npx tsx watch src/workers/interview.worker.ts
 ```
 
-The worker requires Redis and `OPENAI_API_KEY`. Recording storage uses AWS and S3 configuration.
+The report worker requires Redis and an AI provider API key. However, the report queue is not currently connected end to end: ending an interview enqueues a job on `interview-process`, while `src/workers/interview.worker.ts` listens on `interview-processing-queue`. The worker process can start, but it will not consume those report jobs until the queue names are aligned. The separate recording worker in `src/queues/interview.queue.ts` uses `interview-processing` and requires AWS/S3 configuration.
 
 ## Usage
 
@@ -194,7 +194,7 @@ npm run lint
 
 - The frontend and backend currently disagree on some API paths and environment-variable fallbacks. Confirm and align these before using the frontend as an end-to-end client.
 - Interview-status route handling is unfinished: the route parameter name and controller validation do not currently agree.
-- The report queue name used when ending an interview does not match the queue consumed by the report worker. As a result, launching the worker alone does not guarantee that queued reports will be processed.
+- Report jobs are added to the `interview-process` queue, but `src/workers/interview.worker.ts` consumes `interview-processing-queue`; align these names before expecting reports to be generated. The recording worker uses a third queue name, `interview-processing`.
 - Authentication, dashboard behavior, interview lifecycle, and recording/report delivery are still evolving. Treat this project as an experiment rather than a production-ready interview or hiring system.
 
 ## Contributing
