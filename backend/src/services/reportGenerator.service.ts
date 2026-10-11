@@ -6,18 +6,22 @@ import {
   CandidateReport,
 } from "../schemas/candidateReport.schema";
 import { AggregatedAudioTelemetry } from "../utils/meydaAggregator";
-import {  TranscriptItem,CodeSubmissionItem } from "../queues/meyda.queue";
+import { TranscriptItem, CodeSubmissionItem } from "../queues/meyda.queue";
 
 dotenv.config();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export const gemini = new OpenAI({
+  baseURL: process.env.GEMINI_BASE_URL,
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 interface InterviewDataPayload {
   transcript: TranscriptItem[];
-  codeSubmissions:CodeSubmissionItem[];
-  audioTelemetryAverage:AggregatedAudioTelemetry|null;
+  codeSubmissions: CodeSubmissionItem[];
+  audioTelemetryAverage: AggregatedAudioTelemetry | null;
 }
 
-const system_prompt=`
+const system_prompt = `
 You are an expert technical interviewer and speech dynamics analyst. Your task is to analyze a completed AI technical interview session and output a structured candidate evaluation report.
 
 You will be provided with three data streams from the interview session:
@@ -49,7 +53,7 @@ You will be provided with three data streams from the interview session:
 
 ---
 ### OUTPUT REQUIREMENTS
-Output MUST strictly follow the provided JSON schema. Be objective, precise, and actionable. Avoid generic filler praise.`
+Output MUST strictly follow the provided JSON schema. Be objective, precise, and actionable. Avoid generic filler praise.`;
 
 export async function generateCandidateReport(
   data: InterviewDataPayload,
@@ -63,17 +67,36 @@ export async function generateCandidateReport(
     
     ### AUDIO_TELEMETRY
     ${(JSON.stringify(data.audioTelemetryAverage), null, 2)}`;
-
-    const chatcompletion=await openai.chat.completions.create({
-      model:'gpt-4o-2024-08-06',
-      messages:[{role:'system',content:system_prompt},{role:'user',content:userContent}],
-      temperature:0.2,
-      response_format:zodResponseFormat(CandidateReportSchema,'candidate_report')
-    })
-    const rawContent:any= chatcompletion.choices[0].message.content;
-    if(!rawContent){
-      throw new Error('Failed to parse candidate report from OpenAI response.')
-    }
-    const report:CandidateReport=JSON.parse(rawContent);
-    return report;
+  let rawContent: any;
+  try {
+    const chatcompletion = await openai.chat.completions.create({
+      model: "gpt-4o-2024-08-06",
+      messages: [
+        { role: "system", content: system_prompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.2,
+      response_format: zodResponseFormat(
+        CandidateReportSchema,
+        "candidate_report",
+      ),
+    });
+    rawContent = chatcompletion.choices[0].message.content;
+  } catch (openaiError:any) {
+    console.warn(
+      `OpenAI failed (${openaiError.message}). Switching to Gemini...`,
+    );
+    const chatcompletion = await gemini.chat.completions.create({
+      model: "gemini-2.5-flash-lite",
+      messages: [{ role: "user", content: system_prompt }],
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+    });
+    rawContent = chatcompletion.choices[0].message.content;
+  }
+  if (!rawContent) {
+    throw new Error("Failed to parse candidate report from AI response.");
+  }
+  const report: CandidateReport = JSON.parse(rawContent);
+  return report;
 }
