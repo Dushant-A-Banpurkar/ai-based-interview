@@ -12,20 +12,8 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const redis = new Redis(process.env.REDIS_URL!);
 
-// console.log(redis);
-// redis.on("connect", async () => {
-//   try {
-//     console.log(
-//       "Connected to Redis Cloud safely! Adjusting eviction strategy...",
-//     );
-//     await redis.config("SET", "maxmemory-policy", "noeviction");
-//     console.log("Eviction configuration set to noeviction successfully.");
-//   } catch (error) {
-//     console.error("Failed to change configuration policy dynamically:", error);
-//   }
-// });
+
 const allowedOrigins = [
   "http://localhost:3000",
   "https://ai-based-interview-pi.vercel.app/",
