@@ -17,7 +17,6 @@ export default function Home() {
     <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-white selection:bg-blue-500/30">
       <div className="grid w-full max-w-4xl grid-cols-1 overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/40 shadow-2xl backdrop-blur-md md:grid-cols-2">
         
-        {/* Left Info Panel */}
         <div className="relative flex flex-col justify-between border-b border-slate-800/80 p-8 md:border-b-0 md:border-r md:border-slate-800/80 bg-slate-900/60">
           <div className="absolute right-0 top-0 p-6 opacity-5 pointer-events-none">
             <Sparkles className="size-40 text-blue-500" />
@@ -28,7 +27,7 @@ export default function Home() {
               AI Interview Platform
             </span>
 
-            <h1 className="mt-4 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-3xl font-bold leading-tight tracking-tight text-transparent">
+            <h1 className="mt-4 bg-linear-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-3xl font-bold leading-tight tracking-tight text-transparent">
               Master Your Next Technical Assessment
             </h1>
 
@@ -42,8 +41,7 @@ export default function Home() {
             <span>Connected to Render Cloud Backend</span>
           </div>
         </div>
-
-        {/* Right Form Panel (Tabs) */}
+       
         <div className="flex flex-col justify-center p-8 bg-slate-950/40">
           <div className="flex rounded-xl border border-slate-800/80 bg-slate-900/50 p-1 mb-6">
             <button
@@ -67,7 +65,7 @@ export default function Home() {
           </div>
 
           {!isSignUp ? (
-            /* --- SIGN IN FORM --- */
+           
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               {loginErrors.general && (
                 <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-400">
@@ -104,14 +102,13 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 cursor-pointer"
+                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-linear-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 cursor-pointer"
               >
                 {loginMutation.isPending ? "Authenticating..." : "Access Dashboard"}
                 <ArrowRight className="size-4" />
               </button>
             </form>
           ) : (
-            /* --- SIGN UP FORM --- */
             <form onSubmit={handleSignupSubmit} className="space-y-3">
               {signupErrors.general && (
                 <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-400">
@@ -188,7 +185,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={signupMutation.isPending}
-                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 cursor-pointer"
+                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-linear-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 cursor-pointer"
               >
                 {signupMutation.isPending ? "Creating Account..." : "Get Started"}
                 <ArrowRight className="size-4" />
