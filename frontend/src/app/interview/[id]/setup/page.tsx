@@ -138,7 +138,7 @@ export default function SetupPage() {
               Staging Lobby Area
             </span>
 
-            <h1 className="mt-4 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-3xl font-bold leading-tight tracking-tight text-transparent">
+            <h1 className="mt-4 bg-linear-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-3xl font-bold leading-tight tracking-tight text-transparent">
               {interviewData.roleTitle || "Technical Assessment Session"}
             </h1>
 
@@ -203,13 +203,13 @@ export default function SetupPage() {
             type="button"
             onClick={handleLaunchSession}
             disabled={!isReady}
-            className="mt-10 w-full transform rounded-xl border border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-600 py-4 text-sm font-semibold tracking-wide text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:transform-none disabled:border-slate-800 disabled:bg-gradient-to-r disabled:from-slate-900 disabled:to-slate-900 disabled:text-slate-500 disabled:shadow-none md:mt-0"
+            className="mt-10 w-full transform rounded-xl border border-blue-500 bg-linear-to-r from-blue-600 to-indigo-600 py-4 text-sm font-semibold tracking-wide text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:transform-none disabled:border-slate-800 disabled:bg-linear-to-r disabled:from-slate-900 disabled:to-slate-900 disabled:text-slate-500 disabled:shadow-none md:mt-0"
           >
             {isReady ? "Start Live Assessment" : "Complete System Checks"}
           </button>
         </div>
 
-        <div className="relative flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-slate-800/80 bg-slate-900/40 p-6 shadow-2xl md:col-span-2">
+        <div className="relative flex min-h-75 flex-col items-center justify-center rounded-2xl border border-slate-800/80 bg-slate-900/40 p-6 shadow-2xl md:col-span-2">
           {micError ? (
             <div className="p-4 text-center">
               <ShieldAlert className="mx-auto mb-2 size-8 animate-bounce text-rose-500" />
@@ -218,7 +218,7 @@ export default function SetupPage() {
                 Audio Node Handshake Blocked
               </p>
 
-              <p className="mx-auto mt-1 max-w-[200px] text-xs text-slate-500">
+              <p className="mx-auto mt-1 max-w-50 text-xs text-slate-500">
                 Please grant microphone access in your browser settings to
                 continue the evaluation session.
               </p>
