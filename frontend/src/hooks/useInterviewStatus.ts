@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const fetchInterviewStatus = async (interviewId: string) => {
   if (!interviewId) return null;
-  const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:6000";
+  const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
 
   const res = await fetch(`${baseUrl}/api/interviews/${interviewId}/status`);
 
