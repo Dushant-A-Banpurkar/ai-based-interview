@@ -34,7 +34,7 @@ export const socketMiddleware: Middleware = (store) => {
       if (!socket) {
         store.dispatch(setConnectionStatus("connecting"));
 
-        socket = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
+        socket = io(process.env.NEXT_PUBLIC_SOCKET_URL||"http://localhost:5000", {
           query: { interviewId },
           transports: ["websocket"],
           reconnection: true,
@@ -49,7 +49,7 @@ export const socketMiddleware: Middleware = (store) => {
             messageQueue.forEach(({ event, data }) => {
               socket?.emit(event, data);
             });
-            messageQueue = []; // Clear the queue
+            messageQueue = []; 
           }
         });
 
@@ -82,7 +82,6 @@ export const socketMiddleware: Middleware = (store) => {
     }
 
     if (action.type === "socket/disconnect" && socket) {
-      // FIX 1: Debounce the disconnect to survive Strict Mode's rapid mount/unmount cycle
       disconnectTimeout = setTimeout(() => {
         if (socket) {
           socket.off("connect");
@@ -93,7 +92,7 @@ export const socketMiddleware: Middleware = (store) => {
           socket.disconnect();
           socket = null;
         }
-      }, 500); // 500ms grace period allows the connect action to cancel this if remounting
+      }, 500); 
     }
     
     if (action.type === "socket/emit") {
@@ -102,7 +101,7 @@ export const socketMiddleware: Middleware = (store) => {
       if (socket && socket.connected) {
         socket.emit(event, data);
       } else {
-        // FIX 2: Buffer the event if the handshake is still pending instead of dropping it
+        
         messageQueue.push({ event, data });
         console.warn(
           `Socket Emit Buffered: Socket connection is currently inactive. Buffered event: ${event}`,
