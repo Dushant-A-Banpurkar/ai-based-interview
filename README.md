@@ -77,7 +77,7 @@ Create `backend/.env` and set the backend variables described below. Create `fro
 ### Backend environment
 
 ```dotenv
-PORT=6000
+PORT=5000
 MONGODB_URI=mongodb://127.0.0.1:27017/ai-based-interview
 REDIS_URL=redis://localhost:6379
 
@@ -91,7 +91,7 @@ S3_Bucket_NAME=your-s3-bucket-name
 
 | Variable | Required for | Notes |
 | --- | --- | --- |
-| `PORT` | Backend server | Optional; defaults to `6000`. |
+| `PORT` | Backend server | Optional; defaults to `5000`. |
 | `MONGODB_URI` | Backend startup | MongoDB connection string. |
 | `REDIS_URL` | Real-time and queued work | Redis connection string; some components default to `redis://localhost:6379`. Set it explicitly for consistent local and deployed configuration. |
 | `OPENAI_API_KEY` | Report generation | The report worker currently requests the `gpt-4o` model. |
@@ -104,8 +104,8 @@ OpenAI, Deepgram, Judge0, and AWS credentials are feature-specific; configure th
 ### Frontend environment
 
 ```dotenv
-NEXT_PUBLIC_BACKEND_API=http://localhost:6000
-NEXT_PUBLIC_SOCKET_URL=http://localhost:6000
+NEXT_PUBLIC_BACKEND_API=http://localhost:5000
+NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 ```
 
 `NEXT_PUBLIC_SOCKET_URL` is used for the backend host by interview and socket code. `NEXT_PUBLIC_BACKEND_API` is referenced by the login and signup hooks. These values are public and must never contain secrets. The API URL conventions are not fully consistent across the current frontend; see [Current implementation notes](#current-implementation-notes).
@@ -130,7 +130,7 @@ cd frontend
 npm run dev
 ```
 
-The backend listens on `http://localhost:6000` by default. Its health endpoint is `http://localhost:6000/health`. The frontend uses the Next.js development-server default, usually `http://localhost:3000`.
+The backend listens on `http://localhost:5000` by default. Its health endpoint is `http://localhost:5000/health`. The frontend uses the Next.js development-server default, usually `http://localhost:3000`.
 
 Background processing runs in a separate process. Keep the API server running in one terminal, then start the report worker from the backend directory in another:
 
@@ -164,7 +164,7 @@ Interview creation requires `candidateId`, `roleTitle`, and `jobDescription`. Op
 Example health check:
 
 ```sh
-curl http://localhost:6000/health
+curl http://localhost:5000/health
 ```
 
 The frontend is not yet a complete application flow. In particular, the root page is currently a placeholder, and the UI's authentication/dashboard and interview creation routes should not be assumed to work with the backend without further integration.
