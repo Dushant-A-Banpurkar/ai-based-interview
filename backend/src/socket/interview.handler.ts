@@ -25,15 +25,48 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
     sample_rate: 16000,
   });
 
-  dgConnection.on("message", (data: any) => {
+  socket.join(interviewId);
+
+  dgConnection.on("message", async (data: any) => {
     const transcript = data.channel.alternatives[0]?.transcript;
     if (transcript && data.is_final) {
       io.to(interviewId).emit("stt:transcript", { transcript, isFinal: true });
-      redis.rpush(
+      
+      // Save candidate transcript to Redis
+      await redis.rpush(
         `interview:${interviewId}:transcript`,
-        JSON.stringify({ transcript, timestamp: Date.now() }),
+        JSON.stringify({ sender: "candidate", text: transcript, timestamp: Date.now() }),
+      );
+
+      const aiText = "This is a placeholder AI response. Once connected to OpenAI/Gemini, this will be the interviewer's voice/text.";
+      
+      io.to(interviewId).emit("ai_transcript", { 
+        role: "ai", 
+        text: aiText,
+        timestamp: Date.now()
+      });
+
+      // Save AI transcript to Redis
+      await redis.rpush(
+        `interview:${interviewId}:transcript`,
+        JSON.stringify({ sender: "ai", text: aiText, timestamp: Date.now() }),
       );
     }
+  });
+
+  socket.on("start_interview", async () => {
+    const greetingText = "Hello! Let's get started with your technical assessment. Can you walk me through your background?";
+    
+    io.to(interviewId).emit("ai_transcript", {
+      role: "ai",
+      text: greetingText,
+      timestamp: Date.now(),
+    });
+
+    await redis.rpush(
+      `interview:${interviewId}:transcript`,
+      JSON.stringify({ sender: "ai", text: greetingText, timestamp: Date.now() }),
+    );
   });
 
   socket.on("audio:stream", (chunk: Buffer) => {
@@ -45,7 +78,6 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   socket.on("audio:telemetry", (rawPayload) => {
     const parse = VoiceMetricsSchema.safeParse(rawPayload);
     if (!parse.success) return;
-    const metrics = parse.data;
   });
 
   socket.on("meyda_telemetry", async (data) => {
@@ -94,8 +126,11 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
           JSON.stringify({
             language,
             code,
-            stdout: finalStdout,
-            stderr: finalStderr,
+            sandboxResult: {
+              stdout: finalStdout,
+              stderr: finalStderr,
+              status: { id: 0, description: "Accepted" }
+            },
             timestamp: Date.now(),
           }),
         );
