@@ -33,20 +33,23 @@ export interface CodeSubmissionItem {
 async function getInterviewTranscript(
   interviewId: string,
 ): Promise<TranscriptItem[]> {
-  const rawList = await redis.lrange(`interview:${interviewId}:code`, 0, -1);
+  // FIXED: Now correctly reads from transcript key instead of code
+  const rawList = await redis.lrange(`interview:${interviewId}:transcript`, 0, -1);
   return rawList.map((item) => JSON.parse(item));
 }
 
 async function getCodeSubmissions(
   interviewId: string,
 ): Promise<CodeSubmissionItem[]> {
+  // FIXED: Now correctly reads from code key instead of transcript
   const rawList = await redis.lrange(
-    `interview:${interviewId}:transcript`,
+    `interview:${interviewId}:code`,
     0,
     -1,
   );
   return rawList.map((item) => JSON.parse(item));
 }
+
 export async function processInterviewJob(interviewId: string) {
   const rawTelemetry = await redis.lrange(
     `interview:${interviewId}:telemetry`,
