@@ -2,6 +2,7 @@
 import { Middleware } from "@reduxjs/toolkit";
 import { io, Socket } from "socket.io-client";
 import {
+  appendTranscript,
   setConnectionStatus,
   setPhase,
   updateMediaTicks,
@@ -56,6 +57,21 @@ export const socketMiddleware: Middleware = (store) => {
         socket.on("disconnect", () => {
           store.dispatch(setConnectionStatus("disconnected"));
         });
+        socket.on("ai_transcript", (message: { role: "ai"; text: string; timestamp: number }) => {
+        store.dispatch(appendTranscript(message));
+        if("speechSynthesis" in window){
+          const utterance = new SpeechSynthesisUtterance(message.text);
+          utterance.lang = "en-US";
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }});
+
+    socket.on("ai_audio_chunk", (audioBase64: string) => {
+ 
+  const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+  audio.play().catch((err) => console.error("Audio playback error:", err));
+});
 
         socket.on(
           "phase_change",
