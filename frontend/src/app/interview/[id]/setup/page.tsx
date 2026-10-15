@@ -39,25 +39,30 @@ export default function SetupPage() {
   const connectionStatus = useSelector(selectConnectionStatus);
   const liveRms = useSelector(selectLiveRms);
 
-  const { isListening, error: micError } = useMeydaTelemetry({
+const { isListening, error: micError } = useMeydaTelemetry({
     enabled: true,
     bufferSize: 512,
   });
 
   useEffect(() => {
-    if (!interviewId) return;
+  if (interviewId) {
+    // 1. Establish socket connection
+    dispatch({ type: "socket/connect", payload: { interviewId } });
 
+    // 2. Dispatch event to trigger the AI backend orchestrator
     dispatch({
-      type: "socket/connect",
-      payload: { interviewId },
+      type: "socket/emit",
+      payload: {
+        event: "start_interview", // Ensure this matches your backend Socket.IO listener name!
+        data: { interviewId },
+      },
     });
+  }
 
-    return () => {
-      dispatch({
-        type: "socket/disconnect",
-      });
-    };
-  }, [interviewId, dispatch]);
+  return () => {
+    dispatch({ type: "socket/disconnect" });
+  };
+}, [dispatch, interviewId]);
 
   if (isQueryLoading) {
     return (
