@@ -15,18 +15,25 @@ export const interviewReportQueue = new Queue("interview-process", {
   connection,
 });
 
-const s3 = new S3Client({ region: process.env.AWS_REGION });
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT!, 
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
 
 new Worker(
   "interview-processing",
   async (job) => {
     const { interviewId, candidateId, rawAudioBuffer } = job.data;
 
-    const s3Key = `recording/${candidateId}/${interviewId}.wav`;
+    const r2Key = `recording/${candidateId}/${interviewId}.wav`;
     await s3.send(
       new PutObjectCommand({
-        Bucket: process.env.S3_Bucket_NAME,
-        Key: s3Key,
+        Bucket: process.env.R2_BUCKET_NAME!,
+        Key: r2Key,
         Body: Buffer.from(rawAudioBuffer, "base64"),
         ContentType: "audio/wav",
       }),
