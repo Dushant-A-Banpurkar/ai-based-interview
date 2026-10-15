@@ -17,14 +17,23 @@ export default function LiveInterviewPage({ params }: PageProps) {
   const dispatch = useDispatch();
   const phase = useSelector(selectInterviewPhase);
 
-  useEffect(() => {
-    if (interviewId) {
-      dispatch({ type: "socket/connect", payload: { interviewId } });
-    }
-    return () => {
-      dispatch({ type: "socket/disconnect" });
-    };
-  }, [dispatch, interviewId]);
+ useEffect(() => {
+  if (interviewId) {
+    dispatch({ type: "socket/connect", payload: { interviewId } });
+    
+    // Trigger the backend AI orchestrator to start the conversation
+    dispatch({
+      type: "socket/emit",
+      payload: {
+        event: "start_interview",
+        data: { interviewId },
+      },
+    });
+  }
+  return () => {
+    dispatch({ type: "socket/disconnect" });
+  };
+}, [dispatch, interviewId]);
 
   const { isListening, error: micError } = useMeydaTelemetry({ enabled: true });
 
