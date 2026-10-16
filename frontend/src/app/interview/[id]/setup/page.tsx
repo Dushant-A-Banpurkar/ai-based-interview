@@ -50,13 +50,13 @@ const { isListening, error: micError } = useMeydaTelemetry({
     dispatch({ type: "socket/connect", payload: { interviewId } });
 
     // 2. Dispatch event to trigger the AI backend orchestrator
-    dispatch({
-      type: "socket/emit",
-      payload: {
-        event: "start_interview", // Ensure this matches your backend Socket.IO listener name!
-        data: { interviewId },
-      },
-    });
+    // dispatch({
+    //   type: "socket/emit",
+    //   payload: {
+    //     event: "start_interview", // Ensure this matches your backend Socket.IO listener name!
+    //     data: { interviewId },
+    //   },
+    // });
   }
 
   return () => {
