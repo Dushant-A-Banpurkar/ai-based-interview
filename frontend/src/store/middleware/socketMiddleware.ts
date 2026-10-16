@@ -17,7 +17,6 @@ export const socketMiddleware: Middleware = (store) => {
 
   return (next) => (action: any) => {
     if (action.type === "socket/connect") {
-     
       if (disconnectTimeout) {
         clearTimeout(disconnectTimeout);
         disconnectTimeout = null;
@@ -31,47 +30,56 @@ export const socketMiddleware: Middleware = (store) => {
         return next(action);
       }
 
-     
       if (!socket) {
         store.dispatch(setConnectionStatus("connecting"));
 
-        socket = io(process.env.NEXT_PUBLIC_SOCKET_URL||"http://localhost:5000", {
-          query: { interviewId },
-          transports: ["websocket"],
-          reconnection: true,
-          reconnectionAttempts: 5,
-        });
+        socket = io(
+          process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000",
+          {
+            query: { interviewId },
+            transports: ["websocket"],
+            reconnection: true,
+            reconnectionAttempts: 5,
+          },
+        );
 
         socket.on("connect", () => {
           store.dispatch(setConnectionStatus("connected"));
-          
-          
+
           if (messageQueue.length > 0) {
             messageQueue.forEach(({ event, data }) => {
               socket?.emit(event, data);
             });
-            messageQueue = []; 
+            messageQueue = [];
           }
         });
 
         socket.on("disconnect", () => {
           store.dispatch(setConnectionStatus("disconnected"));
         });
-        socket.on("ai_transcript", (message: { role: "ai"; text: string; timestamp: number }) => {
-        store.dispatch(appendTranscript(message));
-        if("speechSynthesis" in window){
-          const utterance = new SpeechSynthesisUtterance(message.text);
-          utterance.lang = "en-US";
-          utterance.rate = 1.0;
-          utterance.pitch = 1.0;
-          window.speechSynthesis.speak(utterance);
-        }});
 
-    socket.on("ai_audio_chunk", (audioBase64: string) => {
- 
-  const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-  audio.play().catch((err) => console.error("Audio playback error:", err));
-});
+        
+        socket.on(
+          "ai_transcript",
+          (message: { role: "ai"; text: string; timestamp: number }) => {
+            store.dispatch(appendTranscript(message));
+            if ("speechSynthesis" in window) {
+              window.speechSynthesis.cancel();
+              const utterance = new SpeechSynthesisUtterance(message.text);
+              utterance.lang = "en-US";
+              utterance.rate = 1.0;
+              utterance.pitch = 1.0;
+              window.speechSynthesis.speak(utterance);
+            }
+          },
+        );
+
+        socket.on("ai_audio_chunk", (audioBase64: string) => {
+          const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+          audio
+            .play()
+            .catch((err) => console.error("Audio playback error:", err));
+        });
 
         socket.on(
           "phase_change",
@@ -108,16 +116,15 @@ export const socketMiddleware: Middleware = (store) => {
           socket.disconnect();
           socket = null;
         }
-      }, 500); 
+      }, 500);
     }
-    
+
     if (action.type === "socket/emit") {
       const { event, data } = action.payload;
-      
+
       if (socket && socket.connected) {
         socket.emit(event, data);
       } else {
-        
         messageQueue.push({ event, data });
         console.warn(
           `Socket Emit Buffered: Socket connection is currently inactive. Buffered event: ${event}`,
