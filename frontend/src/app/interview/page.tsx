@@ -19,7 +19,7 @@ export default function StartNewInterviewPage() {
     allowedLanguages: "javascript, python, cpp",
   });
 
-  const [resumeText, setResumeFile] = useState<File | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -27,25 +27,15 @@ export default function StartNewInterviewPage() {
     >,
   ) => {
     const { name, value, type } = e.target;
-    if (type === "file") {
-      const fileInput = e.target as HTMLInputElement;
-      const file = fileInput.files?.[0];
-      if (file) {
-        setFormData((prev) => ({ ...prev, resumeText: file }));
-      }
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]:
-          type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]:
+        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Safely check for user from TanStack query or fallback cookie inside the event handler
     let candidateId = user?._id || user?.id || user?.candidateId;
 
     if (!candidateId) {
@@ -90,7 +80,7 @@ export default function StartNewInterviewPage() {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
-      resumeText: resumeText,
+      resumeText: resumeFile, // Pass the correct file state here
     };
 
     createSession(payload);
@@ -156,7 +146,7 @@ export default function StartNewInterviewPage() {
               Upload Resume (Optional)
             </label>
             <input
-              name="resumeText"
+              name="resumeFile"
               type="file"
               accept=".pdf"
               onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
@@ -207,7 +197,7 @@ export default function StartNewInterviewPage() {
             htmlFor="enableSandbox"
             className="ml-2 block text-sm text-gray-900"
           >
-            Enable Coding Sandbox
+            Enabled Coding Sandbox
           </label>
         </div>
 
