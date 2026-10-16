@@ -17,46 +17,34 @@ const JUDGE0_LANGUAGE_MAP: Record<string, number> = {
 
 export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   const interviewId = socket.handshake.query.interviewId as string;
-  const deepgram = new DeepgramClient({ apiKey: process.env.DEEPGRAM_API_KEY });
-  const dgConnection = await deepgram.listen.v1.createConnection({
-    model: "nova-3",
-    language: "en",
-    encoding: "linear16",
-    sample_rate: 16000,
-  });
-
   socket.join(interviewId);
 
-  dgConnection.on("message", async (data: any) => {
-    const transcript = data.channel.alternatives[0]?.transcript;
-    if (transcript && data.is_final) {
-      io.to(interviewId).emit("stt:transcript", { transcript, isFinal: true });
-      
-      // Save candidate transcript to Redis
-      await redis.rpush(
-        `interview:${interviewId}:transcript`,
-        JSON.stringify({ sender: "candidate", text: transcript, timestamp: Date.now() }),
-      );
+  let dgConnection: any = null; // Declare upfront to avoid scoping/reference issues
 
-      const aiText = "This is a placeholder AI response. Once connected to OpenAI/Gemini, this will be the interviewer's voice/text.";
-      
-      io.to(interviewId).emit("ai_transcript", { 
-        role: "ai", 
-        text: aiText,
-        timestamp: Date.now()
-      });
-
-      // Save AI transcript to Redis
-      await redis.rpush(
-        `interview:${interviewId}:transcript`,
-        JSON.stringify({ sender: "ai", text: aiText, timestamp: Date.now() }),
-      );
+  // 1. Register socket listeners immediately so early events are not missed
+  socket.on("audio:stream", (chunk: Buffer) => {
+    if (dgConnection && dgConnection.readyState === 1) {
+      dgConnection.sendMedia(chunk);
     }
   });
 
+  socket.on("meyda_telemetry", async (data) => {
+    const parse = VoiceMetricsSchema.safeParse({ ...data, interviewId });
+    if (!parse.success || !parse.data) {
+      console.log("Telemetry validation failed: ", parse);
+      return;
+    }
+    await redis.rpush(
+      `interview:${interviewId}:telemetry`,
+      JSON.stringify(parse.data),
+    );
+    await redis.expire(`interview:${interviewId}:telemetry`, 86400);
+  });
+
   socket.on("start_interview", async () => {
-    const greetingText = "Hello! Let's get started with your technical assessment. Can you walk me through your background?";
-    
+    const greetingText =
+      "Hello! Let's get started with your technical assessment. Can you walk me through your background?";
+
     io.to(interviewId).emit("ai_transcript", {
       role: "ai",
       text: greetingText,
@@ -65,30 +53,17 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
 
     await redis.rpush(
       `interview:${interviewId}:transcript`,
-      JSON.stringify({ sender: "ai", text: greetingText, timestamp: Date.now() }),
+      JSON.stringify({
+        sender: "ai",
+        text: greetingText,
+        timestamp: Date.now(),
+      }),
     );
-  });
-
-  socket.on("audio:stream", (chunk: Buffer) => {
-    if (dgConnection.readyState === 1) {
-      dgConnection.sendMedia(chunk);
-    }
   });
 
   socket.on("audio:telemetry", (rawPayload) => {
     const parse = VoiceMetricsSchema.safeParse(rawPayload);
     if (!parse.success) return;
-  });
-
-  socket.on("meyda_telemetry", async (data) => {
-    const parse = VoiceMetricsSchema.safeParse(data);
-    if (!parse.success) return;
-    const metrics = parse.data;
-    await redis.rpush(
-      `interview:${interviewId}:telemetry`,
-      JSON.stringify(metrics),
-    );
-    await redis.expire(`interview:${interviewId}:telemetry`, 86400);
   });
 
   socket.on(
@@ -129,7 +104,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
             sandboxResult: {
               stdout: finalStdout,
               stderr: finalStderr,
-              status: { id: 0, description: "Accepted" }
+              status: { id: 0, description: "Accepted" },
             },
             timestamp: Date.now(),
           }),
@@ -146,6 +121,53 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   );
 
   socket.on("disconnect", () => {
-    dgConnection.close();
+    if (dgConnection) {
+      dgConnection.close();
+    }
   });
+
+  // 2. Initialize Deepgram connection asynchronously
+  try {
+    const deepgram = new DeepgramClient({ apiKey: process.env.DEEPGRAM_API_KEY });
+    dgConnection = await deepgram.listen.v1.createConnection({
+      model: "nova-3",
+      language: "en",
+      encoding: "linear16",
+      sample_rate: 16000,
+    });
+
+    dgConnection.on("message", async (data: any) => {
+      const transcript = data.channel.alternatives[0]?.transcript;
+      if (transcript && data.is_final) {
+        io.to(interviewId).emit("stt:transcript", { transcript, isFinal: true });
+
+        // Save candidate transcript to Redis
+        await redis.rpush(
+          `interview:${interviewId}:transcript`,
+          JSON.stringify({
+            sender: "candidate",
+            text: transcript,
+            timestamp: Date.now(),
+          }),
+        );
+
+        const aiText =
+          "This is a placeholder AI response. Once connected to OpenAI/Gemini, this will be the interviewer's voice/text.";
+
+        io.to(interviewId).emit("ai_transcript", {
+          role: "ai",
+          text: aiText,
+          timestamp: Date.now(),
+        });
+
+        // Save AI transcript to Redis
+        await redis.rpush(
+          `interview:${interviewId}:transcript`,
+          JSON.stringify({ sender: "ai", text: aiText, timestamp: Date.now() }),
+        );
+      }
+    });
+  } catch (err) {
+    console.error("Deepgram connection initialization error:", err);
+  }
 };
