@@ -47,7 +47,15 @@ export function useMeydaTelemetry({
             .webkitAudioContext;
 
         const audioCtx = new AudioContextClass({ sampleRate: 16000 });
+        if (audioCtx.sampleRate !== 16000) {
+          throw new Error(
+            `AudioContext must run at 16000 Hz, received ${audioCtx.sampleRate} Hz`,
+          );
+        }
         audioContextRef.current = audioCtx;
+        void audioCtx.resume().catch((resumeError) => {
+          console.error("Audio context resume failed:", resumeError);
+        });
 
         const source = audioCtx.createMediaStreamSource(stream);
         sourceRef.current = source;
@@ -96,11 +104,8 @@ export function useMeydaTelemetry({
 
           // Emit raw audio buffer chunk to backend socket
           dispatch({
-            type: "socket/emit",
-            payload: {
-              event: "audio:stream",
-              data: pcm16.buffer,
-            },
+            type: "socket/audioStream",
+            payload: pcm16.buffer,
           });
         };
 
@@ -110,6 +115,14 @@ export function useMeydaTelemetry({
         if (isMounted) setIsListening(true);
       } catch (err: any) {
         console.error("Meyda telemetry & audio stream setup error: ", err);
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        if (
+          audioContextRef.current &&
+          audioContextRef.current.state !== "closed"
+        ) {
+          await audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
         if (isMounted) {
           setError(err.message || "Microphone access denied or unavailable");
           setIsListening(false);
@@ -149,5 +162,20 @@ export function useMeydaTelemetry({
     };
   }, [enabled, bufferSize, dispatch, interviewId]);
 
-  return { isListening, error };
+  const resumeAudioContext = async () => {
+    const audioContext = audioContextRef.current;
+    if (!audioContext) {
+      throw new Error("Audio context has not been initialized");
+    }
+
+    if (audioContext.state !== "running") {
+      await audioContext.resume();
+    }
+
+    if (audioContext.state !== "running") {
+      throw new Error("Audio context could not be resumed");
+    }
+  };
+
+  return { isListening, error, resumeAudioContext };
 }
