@@ -24,6 +24,10 @@ export const selectTranscript = createSelector(
   [selectInterviewState],
   (state) => state.transcriptBuffer,
 );
+export const selectCandidateDraft = createSelector(
+  [selectInterviewState],
+  (state) => state.candidateDraft,
+);
 export const selectLiveRms = createSelector(
   [selectInterviewState],
   (state) => state.mediaTicks?.rms || 0,
