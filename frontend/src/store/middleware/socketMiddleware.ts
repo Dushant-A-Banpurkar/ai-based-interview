@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Middleware } from "@reduxjs/toolkit";
 import { io, Socket } from "socket.io-client";
+import { toast } from "sonner";
 import {
   appendTranscript,
   setConnectionStatus,
@@ -14,6 +15,7 @@ export const socketMiddleware: Middleware = (store) => {
 
   let disconnectTimeout: NodeJS.Timeout | null = null;
   let messageQueue: Array<{ event: string; data: any }> = [];
+  let audioDropWarningLogged = false;
 
   return (next) => (action: any) => {
     if (action.type === "socket/connect") {
@@ -45,6 +47,7 @@ export const socketMiddleware: Middleware = (store) => {
 
         socket.on("connect", () => {
           store.dispatch(setConnectionStatus("connected"));
+          audioDropWarningLogged = false;
 
           if (messageQueue.length > 0) {
             messageQueue.forEach(({ event, data }) => {
@@ -73,6 +76,26 @@ export const socketMiddleware: Middleware = (store) => {
             }
           },
         );
+
+        socket.on(
+          "stt:transcript",
+          (message: { transcript: string; isFinal: boolean }) => {
+            if (message.isFinal && message.transcript.trim()) {
+              store.dispatch(
+                appendTranscript({
+                  role: "candidate",
+                  text: message.transcript,
+                  timestamp: Date.now(),
+                }),
+              );
+            }
+          },
+        );
+
+        socket.on("interview:error", (error: { message: string }) => {
+          console.error("Interview processing error:", error.message);
+          toast.error(error.message);
+        });
 
         socket.on("ai_audio_chunk", (audioBase64: string) => {
           const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
@@ -111,6 +134,9 @@ export const socketMiddleware: Middleware = (store) => {
           socket.off("connect");
           socket.off("disconnect");
           socket.off("phase_change");
+          socket.off("ai_transcript");
+          socket.off("stt:transcript");
+          socket.off("interview:error");
           socket.off("meyda_tick");
           socket.off("sandbox_result");
           socket.disconnect();
@@ -124,6 +150,11 @@ export const socketMiddleware: Middleware = (store) => {
 
       if (socket && socket.connected) {
         socket.emit(event, data);
+      } else if (event === "audio:stream") {
+        if (!audioDropWarningLogged) {
+          console.warn("Audio stream chunk dropped while socket is disconnected.");
+          audioDropWarningLogged = true;
+        }
       } else {
         messageQueue.push({ event, data });
         console.warn(
@@ -131,6 +162,18 @@ export const socketMiddleware: Middleware = (store) => {
         );
       }
     }
+
+    if (action.type === "socket/audioStream") {
+      if (socket && socket.connected) {
+        socket.emit("audio:stream", action.payload);
+      } else if (!audioDropWarningLogged) {
+        console.warn(
+          "Audio stream chunk dropped while socket is disconnected.",
+        );
+        audioDropWarningLogged = true;
+      }
+    }
+
     return next(action);
   };
 };
