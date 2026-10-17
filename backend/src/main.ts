@@ -59,6 +59,13 @@ io.on("connection", (socket) => {
 const PORT: any = process.env.PORT || 5000;
 async function startServer() {
   try {
+    if (!process.env.DEEPGRAM_API_KEY?.trim()) {
+      throw new Error(
+        "DEEPGRAM_API_KEY is missing. Set it in the backend environment or backend/.env.",
+      );
+    }
+    console.log("Deepgram API key loaded from the backend environment.");
+
     await connectMongoDB();
     httpServer.listen(PORT, () => {
       console.log(`AI Interview Backend running on port ${PORT}`);
