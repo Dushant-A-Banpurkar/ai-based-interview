@@ -8,11 +8,14 @@ The repository contains a TypeScript/Express backend and a Next.js frontend. The
 
 - Create interview sessions with a role, job description, skills, difficulty, and optional PDF resume.
 - Stream audio over Socket.IO and request live transcription through Deepgram.
+- Generate contextual interviewer follow-up questions from candidate transcripts using OpenAI, with Gemini as a fallback.
 - Collect audio-derived telemetry in the browser and store session telemetry in Redis.
 - Run submitted code through Judge0 when sandbox execution is enabled.
 - Generate an interview evaluation with OpenAI and persist it in MongoDB.
 
 Some of these paths are not yet wired end to end. See [Current implementation notes](#current-implementation-notes) before relying on the UI or report pipeline.
+
+New to the codebase or preparing to explain it in an interview? Start with the [Project Study Guide](STUDY_GUIDE.md), which walks through the architecture, key files, live audio flow, and known limitations.
 
 ## Technology
 
@@ -21,7 +24,7 @@ Some of these paths are not yet wired end to end. See [Current implementation no
 | Frontend | Next.js 16, React 19, TypeScript, Redux Toolkit, TanStack Query, Socket.IO Client |
 | Backend | Node.js, TypeScript, Express 5, Socket.IO |
 | Data and jobs | MongoDB with Mongoose, Redis, BullMQ |
-| AI and media | OpenAI, Deepgram, Meyda, Judge0 |
+| AI and media | OpenAI, Gemini, Deepgram, Meyda, Judge0 |
 | Testing | Vitest |
 
 ## Repository layout
@@ -51,7 +54,7 @@ frontend/
 - MongoDB (local or hosted).
 - Redis (local or hosted) for Socket.IO telemetry and BullMQ.
 - API credentials for the external services you intend to use:
-  - OpenAI for evaluation reports.
+  - OpenAI or Gemini for live interviewer responses; OpenAI is also used for evaluation reports.
   - Deepgram for live speech transcription.
   - Judge0 RapidAPI for code execution.
   - AWS credentials, region, and an S3 bucket if using recording storage.
@@ -82,6 +85,8 @@ MONGODB_URI=mongodb://127.0.0.1:27017/ai-based-interview
 REDIS_URL=redis://localhost:6379
 
 OPENAI_API_KEY=your-openai-api-key
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
 DEEPGRAM_API_KEY=your-deepgram-api-key
 JUDGE0_API_KEY=your-judge0-rapidapi-key
 
@@ -94,12 +99,16 @@ S3_Bucket_NAME=your-s3-bucket-name
 | `PORT` | Backend server | Optional; defaults to `5000`. |
 | `MONGODB_URI` | Backend startup | MongoDB connection string. |
 | `REDIS_URL` | Real-time and queued work | Redis connection string; some components default to `redis://localhost:6379`. Set it explicitly for consistent local and deployed configuration. |
-| `OPENAI_API_KEY` | Report generation | The report worker currently requests the `gpt-4o` model. |
-| `DEEPGRAM_API_KEY` | Speech transcription | Used by the Socket.IO interview handler. |
+| `OPENAI_API_KEY` | Live interviewer and report generation | The interviewer defaults to `gpt-4o-mini`; the report worker currently requests `gpt-4o`. |
+| `OPENAI_INTERVIEW_MODEL` | Live interviewer | Optional model override; defaults to `gpt-4o-mini`. |
+| `GEMINI_API_KEY` | Live interviewer fallback | Used when OpenAI is unavailable or rate-limited. Set this or `OPENAI_API_KEY` to enable live interviewer responses. |
+| `GEMINI_BASE_URL` | Gemini-compatible API | Optional; defaults to Google's OpenAI-compatible Generative Language API endpoint. |
+| `GEMINI_INTERVIEW_MODEL` | Live interviewer fallback | Optional model override; defaults to `gemini-3.5-flash-lite`. Confirm that the model is available to your Gemini API account. |
+| `DEEPGRAM_API_KEY` | Speech transcription | Used by the Socket.IO interview handler. Backend startup checks that this value is present. |
 | `JUDGE0_API_KEY` | Code execution | Judge0 is accessed through the RapidAPI endpoint. |
 | `AWS_REGION`, `S3_Bucket_NAME` | Recording storage | AWS SDK credentials must also be available through the standard AWS credential chain (for example, environment credentials or an assigned role). |
 
-OpenAI, Deepgram, Judge0, and AWS credentials are feature-specific; configure the services used by your deployment. MongoDB is required for the API to start, and Redis is required for real-time/queue features.
+Deepgram is required for live speech transcription. Configure at least one interviewer AI provider (`OPENAI_API_KEY` or `GEMINI_API_KEY`); if both are configured, Gemini is tried when OpenAI fails. A provider HTTP 429 generally means the account is rate-limited or out of quota—check that provider's usage, billing, and model access. OpenAI, Judge0, and AWS credentials are feature-specific; configure them for the features you use. MongoDB is required for the API to start, and Redis is required for real-time/queue features.
 
 ### Frontend environment
 
@@ -131,6 +140,22 @@ npm run dev
 ```
 
 The backend listens on `http://localhost:5000` by default. Its health endpoint is `http://localhost:5000/health`. The frontend uses the Next.js development-server default, usually `http://localhost:3000`.
+
+### Live audio and interviewer
+
+On the interview setup page, the browser captures microphone audio as 16 kHz, signed 16-bit linear PCM and sends binary chunks over the `audio:stream` Socket.IO event. The backend forwards the chunks to Deepgram (`nova-3`, `linear16`, 16 kHz). Final Deepgram transcripts are saved in Redis and sent to the room as `stt:transcript`; the interviewer uses recent conversation history to generate a follow-up through OpenAI or Gemini and sends it as `ai_transcript`. The live interview page renders both candidate and interviewer messages.
+
+If Deepgram is still connecting, a small bounded number of audio chunks are buffered. Check backend logs for the Deepgram connection-open and first-response messages when diagnosing a missing transcript. Interviewer provider failures are reported to the browser; rate limits or exhausted provider quota must be resolved with the provider account.
+
+### Docker Compose
+
+The Compose backend reads `backend/.env` through `env_file`; create that file and include the required backend settings and service keys before starting Compose. Compose overrides `REDIS_URL` to use the Redis service. Start the containers from the repository root:
+
+```sh
+docker compose up --build
+```
+
+The frontend is built from its Docker image without a host bind mount, keeping `.next` inside the container and avoiding host/container ownership conflicts. Although the frontend Dockerfile sets `USER node`, the current Compose service explicitly overrides that user to `root`; remove that override if you want Compose to run the container as the non-root image user. Rebuild the frontend image after changing frontend source. The backend source is bind-mounted for development.
 
 Background processing runs in a separate process. Keep the API server running in one terminal, then start the report worker from the backend directory in another:
 
