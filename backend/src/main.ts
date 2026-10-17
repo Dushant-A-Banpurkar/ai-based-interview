@@ -16,7 +16,7 @@ const httpServer = createServer(app);
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://ai-based-interview-pi.vercel.app/",
+  "https://ai-based-interview-pi.vercel.app",
   "https://ai-based-interview-git-main-dushant-banpurkar-s-projects.vercel.app",
 ];
 
