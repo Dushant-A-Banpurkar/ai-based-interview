@@ -3,7 +3,11 @@
 import CodeSandbox from "@/src/components/editor/CodeSandbox";
 import AudioVisualizer from "@/src/components/interview/AudioVisualizer";
 import { useMeydaTelemetry } from "@/src/hooks/useMeydaTelemetry";
-import { selectInterviewPhase } from "@/src/store/selectors/interviewSelectors";
+import {
+  selectCandidateDraft,
+  selectInterviewPhase,
+  selectTranscript,
+} from "@/src/store/selectors/interviewSelectors";
 import React, { use, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -16,6 +20,8 @@ export default function LiveInterviewPage({ params }: PageProps) {
 
   const dispatch = useDispatch();
   const phase = useSelector(selectInterviewPhase);
+  const transcript = useSelector(selectTranscript);
+  const candidateDraft = useSelector(selectCandidateDraft);
 
  useEffect(() => {
   if (interviewId) {
@@ -68,10 +74,43 @@ export default function LiveInterviewPage({ params }: PageProps) {
         )}
 
         <div className="flex-1 bg-slate-900/40 rounded-xl p-5 border border-slate-800/80 mb-6 overflow-y-auto shadow-inner backdrop-blur-sm">
-          <p className="text-slate-500 text-xs tracking-wide italic animate-pulse">
-            Transcript stream synced via Redux middleware... Awaiting server
-            packet transmission loops.
-          </p>
+          <div className="space-y-4" aria-live="polite">
+            {transcript.length === 0 && !candidateDraft ? (
+              <p className="text-slate-500 text-xs tracking-wide italic animate-pulse">
+                Waiting for the interviewer and candidate to speak...
+              </p>
+            ) : (
+              <>
+                {transcript.map((message, index) => (
+                  <div
+                    key={`${message.role}-${message.timestamp}-${index}`}
+                    className={`max-w-[85%] rounded-xl p-3 ${
+                      message.role === "ai"
+                        ? "bg-blue-950/50 text-blue-100"
+                        : "ml-auto bg-slate-800 text-slate-100"
+                    }`}
+                  >
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">
+                      {message.role === "ai" ? "Interviewer" : "You"}
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {message.text}
+                    </p>
+                  </div>
+                ))}
+                {candidateDraft && (
+                  <div className="ml-auto max-w-[85%] rounded-xl bg-slate-800/70 p-3 text-slate-300">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">
+                      You · listening
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {candidateDraft}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3 bg-slate-900/20 p-4 rounded-xl border border-slate-900 shadow-inner">
@@ -91,12 +130,27 @@ export default function LiveInterviewPage({ params }: PageProps) {
               {"</>"}
             </div>
             <p className="text-lg font-semibold text-slate-300 mb-2 tracking-tight">
-              Coding Workspace Locked
+              Coding Workspace
             </p>
             <p className="text-sm text-slate-500 max-w-xs leading-relaxed mx-auto">
-              The secure environment sandbox will trigger open automatically
-              when the backend orchestrator advances the interview phase.
+              Your coding workspace is ready when you are. Start the coding
+              phase to open the editor and run code in the sandbox.
             </p>
+            <button
+              type="button"
+              onClick={() =>
+                dispatch({
+                  type: "socket/emit",
+                  payload: {
+                    event: "start_coding",
+                    data: { interviewId },
+                  },
+                })
+              }
+              className="mt-6 rounded-xl border border-blue-500 bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              Start coding exercise
+            </button>
           </div>
         )}
       </div>
