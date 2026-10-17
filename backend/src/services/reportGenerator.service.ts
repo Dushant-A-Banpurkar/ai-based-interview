@@ -87,7 +87,7 @@ export async function generateCandidateReport(
       `OpenAI failed (${openaiError.message}). Switching to Gemini...`,
     );
     const chatcompletion = await gemini.chat.completions.create({
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.5-flash-lite",
       messages: [{ role: "user", content: system_prompt }],
       temperature: 0.2,
       response_format: { type: "json_object" },
