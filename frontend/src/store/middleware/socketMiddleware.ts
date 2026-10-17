@@ -4,6 +4,7 @@ import { io, Socket } from "socket.io-client";
 import { toast } from "sonner";
 import {
   appendTranscript,
+  setCandidateDraft,
   setConnectionStatus,
   setPhase,
   updateMediaTicks,
@@ -80,7 +81,9 @@ export const socketMiddleware: Middleware = (store) => {
         socket.on(
           "stt:transcript",
           (message: { transcript: string; isFinal: boolean }) => {
-            if (message.isFinal && message.transcript.trim()) {
+            if (!message.isFinal) {
+              store.dispatch(setCandidateDraft(message.transcript));
+            } else if (message.transcript.trim()) {
               store.dispatch(
                 appendTranscript({
                   role: "candidate",
@@ -88,6 +91,7 @@ export const socketMiddleware: Middleware = (store) => {
                   timestamp: Date.now(),
                 }),
               );
+              store.dispatch(setCandidateDraft(""));
             }
           },
         );
