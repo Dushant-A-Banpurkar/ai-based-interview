@@ -29,15 +29,12 @@ services:
 
   frontend:
     build: ./frontend
+    user: "root"
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_BACKEND_API=http://localhost:5000
       - NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-     
     depends_on:
       - backend
       - redis
