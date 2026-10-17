@@ -39,7 +39,11 @@ export default function SetupPage() {
   const connectionStatus = useSelector(selectConnectionStatus);
   const liveRms = useSelector(selectLiveRms);
 
-const { isListening, error: micError } = useMeydaTelemetry({
+const {
+  isListening,
+  error: micError,
+  resumeAudioContext,
+} = useMeydaTelemetry({
     enabled: true,
     bufferSize: 512,
   });
@@ -103,7 +107,7 @@ const { isListening, error: micError } = useMeydaTelemetry({
     );
   }
 
-  const handleLaunchSession = () => {
+  const handleLaunchSession = async () => {
     if (connectionStatus !== "connected") {
       toast.error(
         "Network connection is not ready. Please wait until the server connection is established.",
@@ -114,6 +118,16 @@ const { isListening, error: micError } = useMeydaTelemetry({
     if (micError || !isListening) {
       toast.error(
         "Microphone access is required. Please allow microphone permissions and try again.",
+      );
+      return;
+    }
+
+    try {
+      await resumeAudioContext();
+    } catch (error) {
+      console.error("Unable to resume audio before launching:", error);
+      toast.error(
+        "Audio is not ready. Please allow microphone access and try again.",
       );
       return;
     }
