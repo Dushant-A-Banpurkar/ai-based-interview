@@ -17,6 +17,7 @@ export interface InterviewState {
   connectionStatus: "idle" | "connecting" | "connected" | "disconnected";
   phase: "lobby" | "technical_qa" | "live_coding" | "closing";
   transcriptBuffer: TranscriptMessage[];
+  candidateDraft: string;
   mediaTicks: MediaTicks | null;
   timer: number;
   sandboxOutput: string;
@@ -27,6 +28,7 @@ const initialState: InterviewState = {
   connectionStatus: "idle",
   phase: "lobby",
   transcriptBuffer: [],
+  candidateDraft: "",
   mediaTicks: null,
   timer: 0,
   sandboxOutput: "Sandbox ready. Output will appear here...",
@@ -53,6 +55,9 @@ const interviewSlice = createSlice({
     },
     appendTranscript: (state, action: PayloadAction<TranscriptMessage>) => {
       state.transcriptBuffer.push(action.payload);
+    },
+    setCandidateDraft: (state, action: PayloadAction<string>) => {
+      state.candidateDraft = action.payload;
     },
     updateMediaTicks: (state, action: PayloadAction<MediaTicks>) => {
       state.mediaTicks = action.payload;
@@ -89,6 +94,7 @@ export const {
   setPhase,
   updateSandboxOutput,
   appendTranscript,
+  setCandidateDraft,
   updateMediaTicks,
   setTimer,
   resetSession,
