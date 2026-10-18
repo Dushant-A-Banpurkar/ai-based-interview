@@ -6,6 +6,7 @@ export interface IInterview extends Document {
   targetSkills: string[];
   resumeText: string;
   jobDescription: string;
+  durationMinutes: 15 | 30 | 50;
   difficultyMode: "beginner" | "medium" | "hard" | "extreme";
   enableSandbox: boolean;
   allowedLanguages: string[];
@@ -57,6 +58,12 @@ const InterviewSchema: Schema<IInterview> = new Schema(
       enum: ["scheduled", "live", "processing", "completed"],
       default: "scheduled",
       index: true,
+    },
+    durationMinutes: {
+      type: Number,
+      enum: [15, 30, 50],
+      required: true,
+      default: 15,
     },
   },
   {
