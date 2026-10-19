@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setTargetSession } from "../store/slices/interviewSlice";
 import { toast } from "sonner";
-import { useAuthUser } from "./authMe";
 
 interface CreateInterviewPayload {
   candidateId: string;
   roleTitle: string;
   jobDescription: string;
   difficultyMode?: "beginner" | "medium" | "hard" | "extreme";
+  durationMinutes: 15 | 30 | 50;
   enableSandbox?: boolean;
   allowedLanguages: string[];
   targetSkills: string[];
@@ -24,6 +24,7 @@ const createInterviewSession = async (payload: CreateInterviewPayload) => {
   formData.append("candidateId", payload.candidateId);
   formData.append("roleTitle", payload.roleTitle);
   formData.append("jobDescription", payload.jobDescription);
+  formData.append("durationMinutes", String(payload.durationMinutes));
   if (payload.difficultyMode)
     formData.append("difficultyMode", payload.difficultyMode);
   formData.append("enableSandbox", String(payload.enableSandbox ?? true));
