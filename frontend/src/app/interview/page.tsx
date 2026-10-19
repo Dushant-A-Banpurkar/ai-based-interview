@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { useAuthUser } from "@/src/hooks/authMe";
 import Cookies from "js-cookie";
 
+const durationOptions = [15, 30, 50] as const;
+
 export default function StartNewInterviewPage() {
   const { data: user } = useAuthUser();
   const { mutate: createSession, isPending } = useCreateInterviewSession();
@@ -14,6 +16,7 @@ export default function StartNewInterviewPage() {
     roleTitle: "",
     jobDescription: "",
     difficultyMode: "medium",
+    durationMinutes: "15",
     enableSandbox: true,
     targetSkills: "",
     allowedLanguages: "javascript, python, cpp",
@@ -62,6 +65,14 @@ export default function StartNewInterviewPage() {
       return;
     }
 
+    const durationMinutes = durationOptions.find(
+      (minutes) => minutes === Number(formData.durationMinutes),
+    );
+    if (!durationMinutes) {
+      toast.error("Please select a valid interview duration.");
+      return;
+    }
+
     const payload = {
       candidateId,
       roleTitle: formData.roleTitle,
@@ -71,6 +82,7 @@ export default function StartNewInterviewPage() {
         | "medium"
         | "hard"
         | "extreme",
+      durationMinutes,
       enableSandbox: formData.enableSandbox,
       targetSkills: formData.targetSkills
         .split(",")
@@ -123,7 +135,7 @@ export default function StartNewInterviewPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Difficulty Mode
@@ -138,6 +150,24 @@ export default function StartNewInterviewPage() {
               <option value="medium">Medium</option>
               <option value="hard">Hard</option>
               <option value="extreme">Extreme</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Interview Duration
+            </label>
+            <select
+              name="durationMinutes"
+              value={formData.durationMinutes}
+              onChange={handleInputChange}
+              className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {durationOptions.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} minutes
+                </option>
+              ))}
             </select>
           </div>
 
