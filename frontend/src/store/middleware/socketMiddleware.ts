@@ -62,7 +62,6 @@ export const socketMiddleware: Middleware = (store) => {
           store.dispatch(setConnectionStatus("disconnected"));
         });
 
-        
         socket.on(
           "ai_transcript",
           (message: { role: "ai"; text: string; timestamp: number }) => {
@@ -156,7 +155,9 @@ export const socketMiddleware: Middleware = (store) => {
         socket.emit(event, data);
       } else if (event === "audio:stream") {
         if (!audioDropWarningLogged) {
-          console.warn("Audio stream chunk dropped while socket is disconnected.");
+          console.warn(
+            "Audio stream chunk dropped while socket is disconnected.",
+          );
           audioDropWarningLogged = true;
         }
       } else {
