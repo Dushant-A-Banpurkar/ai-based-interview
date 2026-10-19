@@ -56,7 +56,7 @@ export async function createInterviewSession(
       difficultyMode = "medium",
       enableSandbox,
       allowedLanguages,
-      durationMinutes,
+      durationMinutes=15,
       targetSkills,
     } = validationResult.data;
 
