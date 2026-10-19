@@ -53,13 +53,20 @@ const connection = new ioredis_1.default(process.env.REDIS_URL, {
 exports.interviewReportQueue = new bullmq_1.Queue("interview-process", {
     connection,
 });
-const s3 = new client_s3_1.S3Client({ region: process.env.AWS_REGION });
+const s3 = new client_s3_1.S3Client({
+    region: "auto",
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+});
 new bullmq_1.Worker("interview-processing", async (job) => {
     const { interviewId, candidateId, rawAudioBuffer } = job.data;
-    const s3Key = `recording/${candidateId}/${interviewId}.wav`;
+    const r2Key = `recording/${candidateId}/${interviewId}.wav`;
     await s3.send(new client_s3_1.PutObjectCommand({
-        Bucket: process.env.S3_Bucket_NAME,
-        Key: s3Key,
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: r2Key,
         Body: Buffer.from(rawAudioBuffer, "base64"),
         ContentType: "audio/wav",
     }));

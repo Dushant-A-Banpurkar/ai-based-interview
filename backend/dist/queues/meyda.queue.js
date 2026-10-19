@@ -46,11 +46,13 @@ const interview_model_1 = require("../model/interview.model");
 dotenv.config();
 const redis = new ioredis_1.default(process.env.REDIS_URL);
 async function getInterviewTranscript(interviewId) {
-    const rawList = await redis.lrange(`interview:${interviewId}:code`, 0, -1);
+    // FIXED: Now correctly reads from transcript key instead of code
+    const rawList = await redis.lrange(`interview:${interviewId}:transcript`, 0, -1);
     return rawList.map((item) => JSON.parse(item));
 }
 async function getCodeSubmissions(interviewId) {
-    const rawList = await redis.lrange(`interview:${interviewId}:transcript`, 0, -1);
+    // FIXED: Now correctly reads from code key instead of transcript
+    const rawList = await redis.lrange(`interview:${interviewId}:code`, 0, -1);
     return rawList.map((item) => JSON.parse(item));
 }
 async function processInterviewJob(interviewId) {

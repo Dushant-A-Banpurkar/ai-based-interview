@@ -78,6 +78,12 @@ const InterviewSchema = new mongoose_1.Schema({
         default: "scheduled",
         index: true,
     },
+    durationMinutes: {
+        type: Number,
+        enum: [15, 30, 50],
+        required: true,
+        default: 15,
+    },
 }, {
     timestamps: true,
     versionKey: false,

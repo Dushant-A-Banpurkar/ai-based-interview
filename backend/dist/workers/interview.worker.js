@@ -138,7 +138,7 @@ Return a JSON object conforming strictly to this structure:
     catch (openaiError) {
         console.warn(`[Worker] OpenAI failed (${openaiError.message}). Switching to Gemini for interview report...`);
         const completion = await exports.gemini.chat.completions.create({
-            model: "gemini-2.5-flash-lite",
+            model: "gemini-3.5-flash-lite",
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },

@@ -43,33 +43,18 @@ const cors_1 = __importDefault(require("cors"));
 const interview_routes_1 = __importDefault(require("./routes/interview.routes"));
 const interview_handler_1 = require("./socket/interview.handler");
 const mongodb_1 = __importDefault(require("./database/mongodb"));
-const ioredis_1 = __importDefault(require("ioredis"));
 const dotenv = __importStar(require("dotenv"));
 dotenv.config();
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
-const redis = new ioredis_1.default(process.env.REDIS_URL);
-// console.log(redis);
-// redis.on("connect", async () => {
-//   try {
-//     console.log(
-//       "Connected to Redis Cloud safely! Adjusting eviction strategy...",
-//     );
-//     await redis.config("SET", "maxmemory-policy", "noeviction");
-//     console.log("Eviction configuration set to noeviction successfully.");
-//   } catch (error) {
-//     console.error("Failed to change configuration policy dynamically:", error);
-//   }
-// });
 const allowedOrigins = [
     "http://localhost:3000",
-    "https://ai-based-job-tracker-frontend.vercel.app",
-    "https://ai-based-job-tracker-frontend-gkhw3me4r.vercel.app",
+    "https://ai-based-interview-pi.vercel.app",
+    "https://ai-based-interview-git-main-dushant-banpurkar-s-projects.vercel.app",
 ];
 // Unified CORS options for Express & Socket.IO
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow server-to-server requests or matching origins (handling optional trailing slashes)
         if (!origin || allowedOrigins.some((o) => origin.startsWith(o))) {
             callback(null, true);
         }
@@ -99,10 +84,24 @@ io.on("connection", (socket) => {
 const PORT = process.env.PORT || 5000;
 async function startServer() {
     try {
+        if (!process.env.DEEPGRAM_API_KEY?.trim()) {
+            throw new Error("DEEPGRAM_API_KEY is missing. Set it in the backend environment or backend/.env.");
+        }
+        console.log("Deepgram API key loaded from the backend environment.");
         await (0, mongodb_1.default)();
         httpServer.listen(PORT, () => {
             console.log(`AI Interview Backend running on port ${PORT}`);
         });
+        const renderUrl = process.env.render;
+        setInterval(async () => {
+            try {
+                const response = await fetch(renderUrl);
+                console.log(`Keep-alive ping successful: ${response.status}`);
+            }
+            catch (error) {
+                console.error(`Keep-alive ping failed:`, error.message);
+            }
+        }, 14 * 60 * 1000);
     }
     catch (error) {
         console.error("Failed to initialize backend server: ", error.message);

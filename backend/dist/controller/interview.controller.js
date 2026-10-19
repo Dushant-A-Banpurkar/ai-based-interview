@@ -40,7 +40,7 @@ async function createInterviewSession(req, res) {
             });
             return;
         }
-        const { candidateId, roleTitle, jobDescription, difficultyMode = "medium", enableSandbox, allowedLanguages, targetSkills, } = validationResult.data;
+        const { candidateId, roleTitle, jobDescription, difficultyMode = "medium", enableSandbox, allowedLanguages, durationMinutes = 15, targetSkills, } = validationResult.data;
         let extractedResumeText = "";
         if (req.file) {
             const unitArrayData = new Uint8Array(req.file.buffer);
@@ -61,6 +61,7 @@ async function createInterviewSession(req, res) {
             difficultyMode,
             enableSandbox,
             allowedLanguages,
+            durationMinutes,
             status: "scheduled",
         });
         res.status(201).json({
