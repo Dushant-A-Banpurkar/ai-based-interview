@@ -8,7 +8,7 @@ import {
   generateInterviewerResponse,
   InterviewerProviderError,
 } from "../services/interviewAssistant.service";
-
+import { InterviewModel } from "../model/interview.model";
 dotenv.config();
 
 const redis = new Redis(process.env.REDIS_URL!);
@@ -31,7 +31,8 @@ function toPcmBuffer(chunk: unknown): Buffer | null {
 export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   const interviewId = socket.handshake.query.interviewId as string;
   socket.join(interviewId);
-
+  let interviewDurationMinutes: number | null = null;
+  let interviewStartedAt: number | null = null;
   let dgConnection: any = null;
   const pendingAudioChunks: Buffer[] = [];
   const maxPendingAudioChunks = 8;
@@ -106,7 +107,21 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
               (entry.sender === "ai" || entry.sender === "candidate") &&
               typeof entry.text === "string",
           );
-        const aiText = await generateInterviewerResponse(conversation);
+        if (interviewDurationMinutes === null || interviewStartedAt === null) {
+          throw new Error("Interview duration or start time is unavailable.");
+        }
+
+        const elapsedMinutes = (Date.now() - interviewStartedAt) / 60_000;
+        const remainingMinutes = Math.max(
+          0,
+          Math.ceil(interviewDurationMinutes - elapsedMinutes),
+        );
+
+        const aiText = await generateInterviewerResponse(
+          conversation,
+          interviewDurationMinutes,
+          remainingMinutes,
+        );
 
         await redis.rpush(
           `interview:${interviewId}:transcript`,
@@ -220,6 +235,27 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   });
 
   socket.on("start_interview", async () => {
+    try {
+      const interview =
+        await InterviewModel.findById(interviewId).select("durationMinutes");
+
+      if (!interview) {
+        io.to(interviewId).emit("interview:error", {
+          message: "Interview session not found.",
+        });
+        return;
+      }
+      interviewDurationMinutes = interview.durationMinutes;
+      if (interviewStartedAt === null) {
+        interviewStartedAt = Date.now();
+      }
+    } catch (error: any) {
+      console.error(`Failed to load interview ${interviewId}:`, error);
+      io.to(interviewId).emit("interview:error", {
+        message: "Could not load the interview session.",
+      });
+      return;
+    }
     const greetingText =
       "Hello! Let's get started with your technical assessment. Can you walk me through your background?";
 
@@ -419,10 +455,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
       "Deepgram connection successfully opened for interview: " + interviewId,
     );
 
-    while (
-      pendingAudioChunks.length > 0 &&
-      connectionToOpen.readyState === 1
-    ) {
+    while (pendingAudioChunks.length > 0 && connectionToOpen.readyState === 1) {
       const chunk = pendingAudioChunks[0];
       connectionToOpen.sendMedia(chunk);
       pendingAudioChunks.shift();
