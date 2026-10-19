@@ -126,7 +126,7 @@ const registerInterviewHandlers = async (io, socket) => {
             }
             const elapsedMinutes = (Date.now() - interviewStartedAt) / 60_000;
             const remainingMinutes = Math.max(0, Math.ceil(interviewDurationMinutes - elapsedMinutes));
-            const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes, elapsedMinutes);
+            const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes, remainingMinutes);
             await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
                 sender: "ai",
                 text: aiText,
