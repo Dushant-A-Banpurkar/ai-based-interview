@@ -11,7 +11,10 @@ export const VoiceMetricsSchema = z.object({
 export const CodeSubmissionSchema = z.object({
   interviewId: z.string().min(1, "Interview ID is required"),
   languageId: z.number(),
-  sourceCode: z.string().min(1, "Source code cannot be empty")
+  sourceCode: z.string().min(1, "Source code cannot be empty"),
+  problemId:z.string().min(1,"Problem Id is required"),
+  problemPrompt:z.string().min(1,"Problem Prompt is required"),
+  submissionStatus:z.enum(["attempted","solved","timed_out"])
 });
 
 export type VoiceMetrics = z.infer<typeof VoiceMetricsSchema>;
