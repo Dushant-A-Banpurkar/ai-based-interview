@@ -110,6 +110,11 @@ export interface ICodeSubmission extends Document {
   interviewId: string;
   languageId?: number;
   sourceCode?: string;
+  problemId:string;
+  problemPrompt:string;
+  submissionStatus:"attempted"|"solved"|"timed_out";
+  executionStatus?:string;
+  timeSpentSeconds?:number;
 }
 
 const CodeSubmissionSchema: Schema<ICodeSubmission> = new Schema(
@@ -119,6 +124,25 @@ const CodeSubmissionSchema: Schema<ICodeSubmission> = new Schema(
       required: true,
       trim: true,
       index: true,
+    },
+    problemId: {
+      type: String,
+      required: true,
+    },
+    problemPrompt: {
+      type: String,
+      required: true,
+    },
+    submissionStatus: {
+      type: String,
+      enum: ["attempted", "solved", "timed_out"],
+      required: true,
+    },
+    executionStatus: {
+      type: String,
+    },
+    timeSpentSeconds: {
+      type: Number,
     },
     languageId: {
       type: Number,
