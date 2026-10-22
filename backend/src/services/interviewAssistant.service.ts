@@ -2,6 +2,14 @@ import OpenAI from "openai";
 
 type ChatCompletionMessageParam = OpenAI.ChatCompletionMessageParam;
 
+
+interface CodingContext{
+  problemPrompt:string;
+  language:string;
+  sourceCode:string;
+  outcome:"attempted"|"timed_out"|"solved";
+  timeSpentSeconds:number;
+}
 export class InterviewerProviderError extends Error {
   constructor(
     message: string,
@@ -27,12 +35,22 @@ interface InterviewTranscriptEntry {
 function createMessages(
   transcript: InterviewTranscriptEntry[],
   durationMinutes:number,
-  remainingMinutes:number
+  remainingMinutes:number,
+  codingContext?:CodingContext
 ): ChatCompletionMessageParam[] {
+  const codingInstructions=codingContext?`The candidate has finished a coding assignment.
+       Problem: ${codingContext.problemPrompt}
+       Language: ${codingContext.language}
+       Outcome: ${codingContext.outcome}
+       Time used: ${codingContext.timeSpentSeconds} seconds
+       Submitted code:
+       ${codingContext.sourceCode}
+       Ask one concise follow-up about their approach. Do not claim the solution is correct unless test results confirm it.`
+    : "";
   return [
     { role: "system", content: `${interviewerSystemPrompt} 
       
-      Interview duration: ${durationMinutes} minutes. Remaining time: ${remainingMinutes} minutes.` },
+      Interview duration: ${durationMinutes} minutes. Remaining time: ${remainingMinutes} minutes. ${codingInstructions}` },
     ...transcript.map(({ sender, text }) => ({
       role: sender === "ai" ? ("assistant" as const) : ("user" as const),
       content: text,
@@ -86,9 +104,10 @@ function providerErrorDetails(provider: string, error: unknown): string {
 export async function generateInterviewerResponse(
   transcript: InterviewTranscriptEntry[],
   durationMinutes:number,
-  remainingMinutes:number
+  remainingMinutes:number,
+  codingContext?:CodingContext,
 ): Promise<string> {
-  const messages = createMessages(transcript,durationMinutes,remainingMinutes);
+  const messages = createMessages(transcript,durationMinutes,remainingMinutes,codingContext);
   const providerErrors: unknown[] = [];
 
   if (process.env.OPENAI_API_KEY) {
