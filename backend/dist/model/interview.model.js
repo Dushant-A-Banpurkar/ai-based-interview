@@ -113,6 +113,25 @@ const CodeSubmissionSchema = new mongoose_1.Schema({
         trim: true,
         index: true,
     },
+    problemId: {
+        type: String,
+        required: true,
+    },
+    problemPrompt: {
+        type: String,
+        required: true,
+    },
+    submissionStatus: {
+        type: String,
+        enum: ["attempted", "solved", "timed_out"],
+        required: true,
+    },
+    executionStatus: {
+        type: String,
+    },
+    timeSpentSeconds: {
+        type: Number,
+    },
     languageId: {
         type: Number,
     },
