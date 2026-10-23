@@ -2,14 +2,18 @@ import OpenAI from "openai";
 
 type ChatCompletionMessageParam = OpenAI.ChatCompletionMessageParam;
 
-
-interface CodingContext{
-  problemPrompt:string;
-  language:string;
-  sourceCode:string;
-  outcome:"attempted"|"timed_out"|"solved";
-  timeSpentSeconds:number;
+export interface CodingContext {
+  problemPrompt: string;
+  language: string;
+  sourceCode: string;
+  outcome: "attempted" | "timed_out" | "solved";
+  timeSpentSeconds: number;
+  testSummary?: {
+    passed: number;
+    total: number;
+  };
 }
+
 export class InterviewerProviderError extends Error {
   constructor(
     message: string,
@@ -34,23 +38,33 @@ interface InterviewTranscriptEntry {
 
 function createMessages(
   transcript: InterviewTranscriptEntry[],
-  durationMinutes:number,
-  remainingMinutes:number,
-  codingContext?:CodingContext
+  durationMinutes: number,
+  remainingMinutes: number,
+  codingContext?: CodingContext,
 ): ChatCompletionMessageParam[] {
-  const codingInstructions=codingContext?`The candidate has finished a coding assignment.
-       Problem: ${codingContext.problemPrompt}
-       Language: ${codingContext.language}
-       Outcome: ${codingContext.outcome}
-       Time used: ${codingContext.timeSpentSeconds} seconds
-       Submitted code:
-       ${codingContext.sourceCode}
-       Ask one concise follow-up about their approach. Do not claim the solution is correct unless test results confirm it.`
+  const testResults = codingContext?.testSummary
+    ? `Verified tests: ${codingContext.testSummary.passed}/${codingContext.testSummary.total} passed.`
+    : "No verified test results are available.";
+
+  const codingInstructions = codingContext
+    ? `Coding assignment context:
+Problem: ${codingContext.problemPrompt}
+Language: ${codingContext.language}
+Outcome: ${codingContext.outcome}
+Time used: ${codingContext.timeSpentSeconds} seconds.
+${testResults}
+Submitted code:
+${codingContext.sourceCode}
+
+Use this context for a relevant follow-up about the candidate's approach. Ask at most one concise question about it, and do not claim the solution is correct unless verified test results confirm it.`
     : "";
   return [
-    { role: "system", content: `${interviewerSystemPrompt} 
+    {
+      role: "system",
+      content: `${interviewerSystemPrompt} 
       
-      Interview duration: ${durationMinutes} minutes. Remaining time: ${remainingMinutes} minutes. ${codingInstructions}` },
+      Interview duration: ${durationMinutes} minutes. Remaining time: ${remainingMinutes} minutes. ${codingInstructions}`,
+    },
     ...transcript.map(({ sender, text }) => ({
       role: sender === "ai" ? ("assistant" as const) : ("user" as const),
       content: text,
@@ -91,8 +105,7 @@ async function requestGemini(messages: ChatCompletionMessageParam[]) {
 
 function providerErrorDetails(provider: string, error: unknown): string {
   if (error instanceof OpenAI.APIError) {
-    const code =
-      typeof error.code === "string" ? `, code: ${error.code}` : "";
+    const code = typeof error.code === "string" ? `, code: ${error.code}` : "";
     return `${provider} returned HTTP ${error.status}${code}: ${error.message}`;
   }
 
@@ -103,11 +116,16 @@ function providerErrorDetails(provider: string, error: unknown): string {
 
 export async function generateInterviewerResponse(
   transcript: InterviewTranscriptEntry[],
-  durationMinutes:number,
-  remainingMinutes:number,
-  codingContext?:CodingContext,
+  durationMinutes: number,
+  remainingMinutes: number,
+  codingContext?: CodingContext,
 ): Promise<string> {
-  const messages = createMessages(transcript,durationMinutes,remainingMinutes,codingContext);
+  const messages = createMessages(
+    transcript,
+    durationMinutes,
+    remainingMinutes,
+    codingContext,
+  );
   const providerErrors: unknown[] = [];
 
   if (process.env.OPENAI_API_KEY) {
@@ -130,15 +148,11 @@ export async function generateInterviewerResponse(
       throw new Error("Gemini returned an empty interviewer response");
     } catch (geminiError) {
       providerErrors.push(geminiError);
-      const allRateLimited =
-        providerErrors.every(
-          (error) =>
-            error instanceof OpenAI.APIError && error.status === 429,
-        );
+      const allRateLimited = providerErrors.every(
+        (error) => error instanceof OpenAI.APIError && error.status === 429,
+      );
       const details = [
-        ...(!process.env.OPENAI_API_KEY
-          ? ["OpenAI is not configured"]
-          : []),
+        ...(!process.env.OPENAI_API_KEY ? ["OpenAI is not configured"] : []),
         ...providerErrors.map((error, index) =>
           providerErrorDetails(
             index === 0 && process.env.OPENAI_API_KEY ? "OpenAI" : "Gemini",
