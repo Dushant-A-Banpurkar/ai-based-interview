@@ -4,6 +4,7 @@ import { VoiceMetricsSchema } from "../schemas/interviewSocket.schema";
 import * as dotenv from "dotenv";
 import Redis from "ioredis";
 import axios from "axios";
+import type { CodingContext } from "../services/interviewAssistant.service";
 import {
   generateInterviewerResponse,
   InterviewerProviderError,
@@ -117,6 +118,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   let codingStartedAt: number | null = null;
   let latestCode = "";
   let latestLanguage = "javascript";
+  let pendingCodingContext: CodingContext | null = null;
   let codingTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const finishCoding = async (
@@ -191,17 +193,20 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
               typeof entry.text === "string",
           );
 
+        const codingContext: CodingContext = {
+          problemPrompt: codingAssignment.prompt,
+          language,
+          sourceCode: code,
+          outcome: reason === "timed_out" ? "timed_out" : "attempted",
+          timeSpentSeconds,
+        };
+        pendingCodingContext = codingContext;
+
         const aiText = await generateInterviewerResponse(
           conversation,
           interviewDurationMinutes ?? 0,
           remainingMinutes,
-          {
-            problemPrompt: codingAssignment.prompt,
-            language,
-            sourceCode: code,
-            outcome: reason === "timed_out" ? "timed_out" : "attempted",
-            timeSpentSeconds,
-          },
+          codingContext,
         );
         await redis.rpush(
           `interview:${interviewId}:transcript`,
@@ -313,6 +318,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
           conversation,
           interviewDurationMinutes,
           remainingMinutes,
+          pendingCodingContext ?? undefined,
         );
 
         await redis.rpush(
@@ -330,6 +336,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
         });
         lastInterviewerQuestion = aiText;
         scheduleQuestionRepeat();
+        pendingCodingContext = null;
       })
       .catch((error: unknown) => {
         console.error(
