@@ -121,6 +121,7 @@ const registerInterviewHandlers = async (io, socket) => {
     let codingStartedAt = null;
     let latestCode = "";
     let latestLanguage = "javascript";
+    let pendingCodingContext = null;
     let codingTimeout = null;
     const finishCoding = async (reason, finalCode, finalLanguage) => {
         if (!codingActive || codingFinishing || !codingAssignment)
@@ -167,13 +168,15 @@ const registerInterviewHandlers = async (io, socket) => {
                     .map((entry) => JSON.parse(entry))
                     .filter((entry) => (entry.sender === "ai" || entry.sender === "candidate") &&
                     typeof entry.text === "string");
-                const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes ?? 0, remainingMinutes, {
+                const codingContext = {
                     problemPrompt: codingAssignment.prompt,
                     language,
                     sourceCode: code,
                     outcome: reason === "timed_out" ? "timed_out" : "attempted",
                     timeSpentSeconds,
-                });
+                };
+                pendingCodingContext = codingContext;
+                const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes ?? 0, remainingMinutes, codingContext);
                 await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
                     sender: "ai",
                     text: aiText,
@@ -251,7 +254,7 @@ const registerInterviewHandlers = async (io, socket) => {
             }
             const elapsedMinutes = (Date.now() - interviewStartedAt) / 60_000;
             const remainingMinutes = Math.max(0, Math.ceil(interviewDurationMinutes - elapsedMinutes));
-            const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes, remainingMinutes);
+            const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes, remainingMinutes, pendingCodingContext ?? undefined);
             await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
                 sender: "ai",
                 text: aiText,
@@ -264,6 +267,7 @@ const registerInterviewHandlers = async (io, socket) => {
             });
             lastInterviewerQuestion = aiText;
             scheduleQuestionRepeat();
+            pendingCodingContext = null;
         })
             .catch((error) => {
             console.error(`Interviewer response generation failed for interview ${interviewId}:`, error);
