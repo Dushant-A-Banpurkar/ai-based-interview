@@ -1,12 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { fetchInterviewBackend } from "../lib/interviewBackend";
 
 const fetchInterviewReport = async (interviewId: string) => {
   if (!interviewId) return null;
   const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
 
-  const res = await fetch(`${baseUrl}/api/interviews/${interviewId}/report`);
+  const res = await fetchInterviewBackend(`${baseUrl}/api/interviews/${interviewId}/report`);
 
   if (!res.ok) {
     const errData = await res.json();
