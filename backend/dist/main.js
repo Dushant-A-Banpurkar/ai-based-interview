@@ -44,18 +44,39 @@ const interview_routes_1 = __importDefault(require("./routes/interview.routes"))
 const interview_handler_1 = require("./socket/interview.handler");
 const mongodb_1 = __importDefault(require("./database/mongodb"));
 const dotenv = __importStar(require("dotenv"));
+const mongoose_1 = __importDefault(require("mongoose"));
 dotenv.config();
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
 const allowedOrigins = [
     "http://localhost:3000",
+    "http://localhost:5173",
     "https://ai-based-interview-pi.vercel.app",
     "https://ai-based-interview-git-main-dushant-banpurkar-s-projects.vercel.app",
+    ...(process.env.FRONTEND_ORIGINS ?? "")
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
 ];
-// Unified CORS options for Express & Socket.IO
+const isAllowedOrigin = (origin) => {
+    try {
+        const requestUrl = new URL(origin);
+        return allowedOrigins.some((allowedOrigin) => {
+            const allowedUrl = new URL(allowedOrigin);
+            const sameHost = requestUrl.hostname === allowedUrl.hostname ||
+                requestUrl.hostname.endsWith(`.${allowedUrl.hostname}`);
+            return (requestUrl.protocol === allowedUrl.protocol &&
+                sameHost &&
+                (allowedUrl.port === "" || requestUrl.port === allowedUrl.port));
+        });
+    }
+    catch {
+        return false;
+    }
+};
 const corsOptions = {
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.some((o) => origin.startsWith(o))) {
+        if (!origin || isAllowedOrigin(origin)) {
             callback(null, true);
         }
         else {
@@ -72,6 +93,15 @@ const io = new socket_io_1.Server(httpServer, {
 });
 app.get("/health", (req, res) => {
     res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
+});
+app.get("/ready", (_req, res) => {
+    const mongoReady = mongoose_1.default.connection.readyState === 1;
+    res.status(mongoReady ? 200 : 503).json({
+        status: mongoReady ? "ready" : "not_ready",
+        checks: {
+            mongodb: mongoReady ? "connected" : "disconnected",
+        },
+    });
 });
 app.use("/api/interviews", interview_routes_1.default);
 io.on("connection", (socket) => {

@@ -14,17 +14,41 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-const allowedOrigins = new Set([
+const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:5173",
+  "https://ai-based-interview-pi.vercel.app",
+  "https://ai-based-interview-git-main-dushant-banpurkar-s-projects.vercel.app",
   ...(process.env.FRONTEND_ORIGINS ?? "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
-]);
+];
+
+const isAllowedOrigin = (origin: string) => {
+  try {
+    const requestUrl = new URL(origin);
+
+    return allowedOrigins.some((allowedOrigin) => {
+      const allowedUrl = new URL(allowedOrigin);
+      const sameHost =
+        requestUrl.hostname === allowedUrl.hostname ||
+        requestUrl.hostname.endsWith(`.${allowedUrl.hostname}`);
+
+      return (
+        requestUrl.protocol === allowedUrl.protocol &&
+        sameHost &&
+        (allowedUrl.port === "" || requestUrl.port === allowedUrl.port)
+      );
+    });
+  } catch {
+    return false;
+  }
+};
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.has(origin)) {
+    if (!origin || isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
