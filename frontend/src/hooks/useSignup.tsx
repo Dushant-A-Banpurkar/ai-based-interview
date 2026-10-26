@@ -30,7 +30,7 @@ interface SignUpResponse {
 }
 
 const signup = async (formData: signUpForm): Promise<SignUpResponse> => {
-  const url = process.env.NEXT_PUBLIC_BACKEND_API || "http://localhost:5000";
+
 
   const res = await fetchInterviewBackend(`/api/auth/signup`, {
     method: "POST",

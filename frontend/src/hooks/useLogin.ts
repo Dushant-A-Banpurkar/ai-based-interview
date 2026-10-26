@@ -24,7 +24,7 @@ interface AuthUserResponse {
   [key: string]: any;
 }
 const signin = async (data: LoginForm): Promise<AuthUserResponse> => {
-  const url = process.env.NEXT_PUBLIC_BACKEND_API;
+
   const res = await fetchInterviewBackend(`/api/auth/signin`, {
     method: "POST",
     headers: {
