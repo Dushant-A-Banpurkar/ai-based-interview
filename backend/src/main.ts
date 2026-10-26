@@ -13,14 +13,12 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-
 const allowedOrigins = [
   "http://localhost:3000",
   "https://ai-based-interview-pi.vercel.app",
   "https://ai-based-interview-git-main-dushant-banpurkar-s-projects.vercel.app",
 ];
 
-// Unified CORS options for Express & Socket.IO
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.some((o) => origin.startsWith(o))) {
@@ -72,16 +70,16 @@ async function startServer() {
     });
     const renderUrl = process.env.render!;
     setInterval(
-    async () => {
-      try {
-        const response = await fetch(renderUrl!);
-        console.log(`Keep-alive ping successful: ${response.status}`);
-      } catch (error:any) {
-        console.error(`Keep-alive ping failed:`, error.message);
-      }
-    },
-    14 * 60 * 1000,
-  );
+      async () => {
+        try {
+          const response = await fetch(renderUrl!);
+          console.log(`Keep-alive ping successful: ${response.status}`);
+        } catch (error: any) {
+          console.error(`Keep-alive ping failed:`, error.message);
+        }
+      },
+      14 * 60 * 1000,
+    );
   } catch (error: any) {
     console.error("Failed to initialize backend server: ", error.message);
   }
