@@ -7,21 +7,24 @@ import { registerInterviewHandlers } from "./socket/interview.handler";
 import connectMongoDB from "./database/mongodb";
 import Redis from "ioredis";
 import * as dotenv from "dotenv";
+import mongoose from "mongoose";
 
 dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
 
-const allowedOrigins = [
+const allowedOrigins = new Set([
   "http://localhost:3000",
-  "https://ai-based-interview-pi.vercel.app",
-  "https://ai-based-interview-git-main-dushant-banpurkar-s-projects.vercel.app",
-];
+  ...(process.env.FRONTEND_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.some((o) => origin.startsWith(o))) {
+    if (!origin || allowedOrigins.has(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -40,6 +43,16 @@ const io = new Server(httpServer, {
 
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
+});
+
+app.get("/ready", (_req, res) => {
+  const mongoReady = mongoose.connection.readyState === 1;
+  res.status(mongoReady ? 200 : 503).json({
+    status: mongoReady ? "ready" : "not_ready",
+    checks: {
+      mongodb: mongoReady ? "connected" : "disconnected",
+    },
+  });
 });
 
 app.use("/api/interviews", interviewRoutes);
