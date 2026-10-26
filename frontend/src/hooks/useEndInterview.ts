@@ -4,11 +4,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
+import { fetchInterviewBackend } from "../lib/interviewBackend";
 
 const endInterviewSession = async (interviewId: string) => {
   const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
 
-  const res = await fetch(`${baseUrl}/api/interviews/${interviewId}/end`, {
+  const res = await fetchInterviewBackend(`${baseUrl}/api/interviews/${interviewId}/end`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
