@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setTargetSession } from "../store/slices/interviewSlice";
 import { toast } from "sonner";
+import { fetchInterviewBackend } from "../lib/interviewBackend";
 
 interface CreateInterviewPayload {
   candidateId: string;
@@ -36,7 +37,7 @@ const createInterviewSession = async (payload: CreateInterviewPayload) => {
   if (payload.resumeText) {
     formData.append("pdf", payload.resumeText);
   }
-  const res = await fetch(`${baseUrl}/api/interviews/createinterviewsession`, {
+  const res = await fetchInterviewBackend(`${baseUrl}/api/interviews/createinterviewsession`, {
     method: "POST",
     credentials: "include",
     body: formData,
