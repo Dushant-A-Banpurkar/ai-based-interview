@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchInterviewBackend } from "../lib/interviewBackend";
 
 interface signUpForm {
   firstname: string;
@@ -31,7 +32,7 @@ interface SignUpResponse {
 const signup = async (formData: signUpForm): Promise<SignUpResponse> => {
   const url = process.env.NEXT_PUBLIC_BACKEND_API || "http://localhost:5000";
 
-  const res = await fetch(`/api/auth/signup`, {
+  const res = await fetchInterviewBackend(`/api/auth/signup`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
