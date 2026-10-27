@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchInterviewBackend } from "../lib/interviewBackend";
 
 interface signUpForm {
   firstname: string;
@@ -32,7 +31,7 @@ interface SignUpResponse {
 const signup = async (formData: signUpForm): Promise<SignUpResponse> => {
 
 
-  const res = await fetchInterviewBackend(`/api/auth/signup`, {
+  const res = await fetch(`/api/auth/signup`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
