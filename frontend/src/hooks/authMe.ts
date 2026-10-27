@@ -2,9 +2,10 @@
 import { useQuery } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useEffect } from "react";
+import { fetchAuthBackend } from "../lib/authBackend";
 
 const fetchAuthUser = async () => {
-  const response = await fetch(`/api/auth/me`, {
+  const response = await fetchAuthBackend(`/api/auth/me`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
