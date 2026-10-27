@@ -7,9 +7,7 @@ import { toast } from "sonner";
 import { fetchInterviewBackend } from "../lib/interviewBackend";
 
 const endInterviewSession = async (interviewId: string) => {
-  const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
-
-  const res = await fetchInterviewBackend(`${baseUrl}/api/interviews/${interviewId}/end`, {
+  const res = await fetchInterviewBackend(`/api/interviews/${interviewId}/end`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

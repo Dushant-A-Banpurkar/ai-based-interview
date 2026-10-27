@@ -20,7 +20,6 @@ interface CreateInterviewPayload {
 }
 
 const createInterviewSession = async (payload: CreateInterviewPayload) => {
-  const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
   const formData = new FormData();
   formData.append("candidateId", payload.candidateId);
   formData.append("roleTitle", payload.roleTitle);
@@ -37,7 +36,7 @@ const createInterviewSession = async (payload: CreateInterviewPayload) => {
   if (payload.resumeText) {
     formData.append("pdf", payload.resumeText);
   }
-  const res = await fetchInterviewBackend(`${baseUrl}/api/interviews/createinterviewsession`, {
+  const res = await fetchInterviewBackend(`/api/interviews/createinterviewsession`, {
     method: "POST",
     credentials: "include",
     body: formData,
