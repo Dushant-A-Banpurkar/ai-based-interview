@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
+import { fetchAuthBackend } from "../lib/authBackend";
 
 interface LoginForm {
   email: string;
@@ -25,7 +25,7 @@ interface AuthUserResponse {
 }
 const signin = async (data: LoginForm): Promise<AuthUserResponse> => {
 
-  const res = await fetch(`/api/auth/signin`, {
+  const res = await fetchAuthBackend(`/api/auth/signin`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
