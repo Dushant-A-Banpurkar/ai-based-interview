@@ -2,9 +2,9 @@
 import { useQuery } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useEffect } from "react";
-import { fetchInterviewBackend } from "../lib/interviewBackend";
+
 const fetchAuthUser = async () => {
-  const response = await fetchInterviewBackend(`/api/auth/me`, {
+  const response = await fetch(`/api/auth/me`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
