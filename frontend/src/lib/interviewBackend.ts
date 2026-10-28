@@ -5,9 +5,15 @@ const backendUrls = [
   .filter((url): url is string => Boolean(url))
   .map((url) => url.replace(/\/+$/, ""));
 
-async function isReady(baseUrl: string): Promise<boolean> {
+const readinessCache = new Map<
+  string,
+  { promise: Promise<boolean>; expiresAt: number }
+>();
+
+async function checkReady(baseUrl: string): Promise<boolean> {
   const controller = new AbortController();
-  const timeout: number = window.setTimeout(() => controller.abort(), 3000);
+  const timeout = window.setTimeout(() => controller.abort(), 3000);
+
   try {
     const response = await fetch(`${baseUrl}/ready`, {
       cache: "no-store",
@@ -19,6 +25,27 @@ async function isReady(baseUrl: string): Promise<boolean> {
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+function isReady(baseUrl: string): Promise<boolean> {
+  const now = Date.now();
+  const cached = readinessCache.get(baseUrl);
+
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const entry: { promise: Promise<boolean>; expiresAt: number } = {
+    promise: Promise.resolve(false),
+    expiresAt: Number.POSITIVE_INFINITY,
+  };
+  entry.promise = checkReady(baseUrl).then((ready) => {
+    entry.expiresAt = Date.now() + (ready ? 10_000 : 2_000);
+    return ready;
+  });
+
+  readinessCache.set(baseUrl, entry);
+  return entry.promise;
 }
 export async function fetchInterviewBackend(
   path: string,
@@ -39,6 +66,7 @@ export async function fetchInterviewBackend(
       ) {
         continue;
       }
+      return response;
     } catch (error) {
       if (method !== "GET" || i === backendUrls.length - 1) {
         throw error;
