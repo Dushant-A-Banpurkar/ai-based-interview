@@ -102,6 +102,7 @@ async function startServer() {
     console.log("Deepgram API key loaded from the backend environment.");
 
     await connectMongoDB();
+    await import("./workers/interview.worker.js");
     httpServer.listen(PORT, () => {
       console.log(`AI Interview Backend running on port ${PORT}`);
     });
