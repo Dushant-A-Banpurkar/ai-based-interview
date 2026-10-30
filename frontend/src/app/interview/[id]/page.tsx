@@ -5,9 +5,18 @@ import AudioVisualizer from "@/src/components/interview/AudioVisualizer";
 import { useMeydaTelemetry } from "@/src/hooks/useMeydaTelemetry";
 import {
   selectCandidateDraft,
+  selectCodingCompletionReason,
+  selectCodingResultStatus,
+  selectCodingStatus,
+  selectCodingTestSummary,
+  selectCodingUnavailableMessage,
   selectInterviewPhase,
   selectTranscript,
 } from "@/src/store/selectors/interviewSelectors";
+import {
+  setCodingStartRequested,
+  setTargetSession,
+} from "@/src/store/slices/interviewSlice";
 import React, { use, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -22,24 +31,23 @@ export default function LiveInterviewPage({ params }: PageProps) {
   const phase = useSelector(selectInterviewPhase);
   const transcript = useSelector(selectTranscript);
   const candidateDraft = useSelector(selectCandidateDraft);
+  const codingStatus = useSelector(selectCodingStatus);
+  const codingCompletionReason = useSelector(selectCodingCompletionReason);
+  const codingResultStatus = useSelector(selectCodingResultStatus);
+  const codingTestSummary = useSelector(selectCodingTestSummary);
+  const codingUnavailableMessage = useSelector(
+    selectCodingUnavailableMessage,
+  );
 
- useEffect(() => {
-  if (interviewId) {
-    dispatch({ type: "socket/connect", payload: { interviewId } });
-    
-    // Trigger the backend AI orchestrator to start the conversation
-    dispatch({
-      type: "socket/emit",
-      payload: {
-        event: "start_interview",
-        data: { interviewId },
-      },
-    });
-  }
-  return () => {
-    dispatch({ type: "socket/disconnect" });
-  };
-}, [dispatch, interviewId]);
+  useEffect(() => {
+    if (interviewId) {
+      dispatch(setTargetSession({ interviewId }));
+      dispatch({ type: "socket/connect", payload: { interviewId } });
+    }
+    return () => {
+      dispatch({ type: "socket/disconnect" });
+    };
+  }, [dispatch, interviewId]);
 
   const { isListening, error: micError } = useMeydaTelemetry({ enabled: true });
 
@@ -122,8 +130,51 @@ export default function LiveInterviewPage({ params }: PageProps) {
       </div>
 
       <div className="w-1/2 flex flex-col bg-slate-950">
-        {phase === "live_coding" ? (
+        {codingStatus === "active" || phase === "live_coding" ? (
           <CodeSandbox />
+        ) : codingStatus === "completed" ? (
+          <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-950/40 text-emerald-300">
+              ✓
+            </div>
+            <h2 className="mb-2 text-lg font-semibold text-slate-200">
+              Coding submission complete
+            </h2>
+            <p className="max-w-sm text-sm leading-relaxed text-slate-400">
+              {codingCompletionReason === "timed_out"
+                ? "Time expired. Your latest saved code was submitted."
+                : codingCompletionReason === "interview_ended"
+                  ? "Your interview ended and the coding submission was saved."
+                  : "Your final code was saved. The interviewer will continue with a follow-up."}
+            </p>
+            {codingResultStatus && (
+              <p className="mt-3 text-xs text-slate-500">
+                Result: {codingResultStatus}
+                {codingTestSummary
+                  ? ` · ${codingTestSummary.passed}/${codingTestSummary.total} private tests passed`
+                  : ""}
+              </p>
+            )}
+          </div>
+        ) : codingStatus === "unavailable" ? (
+          <div
+            role="status"
+            className="flex flex-1 flex-col items-center justify-center p-8 text-center"
+          >
+            <h2 className="mb-2 text-lg font-semibold text-slate-200">
+              Coding assignment unavailable
+            </h2>
+            <p className="max-w-sm text-sm leading-relaxed text-slate-400">
+              {codingUnavailableMessage}
+            </p>
+          </div>
+        ) : codingStatus === "starting" ? (
+          <div
+            role="status"
+            className="flex flex-1 items-center justify-center text-sm text-slate-400"
+          >
+            Waiting for the interviewer to start the coding assignment…
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center bg-radial from-slate-900/40 via-transparent to-transparent">
             <div className="h-12 w-12 rounded-2xl border border-slate-800 bg-slate-900/50 flex items-center justify-center text-slate-400 font-mono text-lg font-bold shadow-md mb-4">
@@ -138,15 +189,16 @@ export default function LiveInterviewPage({ params }: PageProps) {
             </p>
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                dispatch(setCodingStartRequested());
                 dispatch({
                   type: "socket/emit",
                   payload: {
                     event: "start_coding",
                     data: { interviewId },
                   },
-                })
-              }
+                });
+              }}
               className="mt-6 rounded-xl border border-blue-500 bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               Start coding exercise
