@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Interview frontend
 
-## Getting Started
+The frontend is a Next.js 16 and React 19 application for configuring interview
+sessions, joining a live interview, working through a coding assignment, and
+viewing the resulting report.
 
-First, run the development server:
+## Run locally
 
-```bash
+Install dependencies and start the frontend:
+
+```sh
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Set `frontend/.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```dotenv
+NEXT_PUBLIC_BACKEND_API=http://localhost:5000
+NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The backend, MongoDB, and Redis must also be running. See the repository
+[README](../README.md) for backend environment variables and service setup.
+Microphone access requires browser permission; use localhost or a secure
+context.
 
-## Learn More
+## Live coding flow
 
-To learn more about Next.js, take a look at the following resources:
+The live interview page connects to the backend with Socket.IO. The backend
+decides whether an assignment is available and when its timer starts. When it
+emits `coding:started`, the UI displays the statement, examples, constraints,
+allowed languages, and remaining time.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Run Code** emits `sandbox_execute` and displays the result for the sample
+  input. A successful run does not mean the assignment is solved.
+- **Submit** emits `submit_coding` with the current source and language. The
+  backend stores the final submission and checks its private test cases.
+- The editor sends debounced `coding_draft` events so the latest code and
+  language can be restored after reconnect. The server remains authoritative
+  for assignment availability and timing.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Assignments are selected from a small curated backend bank. Judge0 is required
+for sandbox execution and final verification.
 
-## Deploy on Vercel
+## Development checks
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Run these commands from `frontend/`:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sh
+npm run lint
+npm run build
+```
+
+The Redux Socket.IO middleware is in `src/store/middleware/socketMiddleware.ts`;
+interview/coding state is in `src/store/slices/interviewSlice.ts`; and the live
+interview and editor UI are in `src/app/interview/[id]/page.tsx` and
+`src/components/editor/CodeSandbox.tsx`.
