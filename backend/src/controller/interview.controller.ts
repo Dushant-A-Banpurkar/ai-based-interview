@@ -5,6 +5,8 @@ import { CreateInterviewSchema } from "../schemas/interview.schema";
 import { interviewReportQueue } from "../queues/interview.queue";
 import { z } from "zod";
 import { CandidateReportModel } from "../model/candidateReport.model";
+import { finalizeCodingSubmission } from "../services/codingSubmission.service";
+import { finalizeActiveCodingForInterview } from "../socket/interview.handler";
 interface MulterRequest extends Request {
   file?: globalThis.Express.Multer.File;
 }
@@ -130,6 +132,11 @@ export async function endInterviewSession(
     if (!interview) {
       res.status(404).json({ error: "Interview session not found" });
       return;
+    }
+
+    if (interview.codingStatus === "active") {
+      await finalizeActiveCodingForInterview(interviewId);
+      await finalizeCodingSubmission(interviewId, "interview_ended");
     }
 
     interview.status = "processing";
