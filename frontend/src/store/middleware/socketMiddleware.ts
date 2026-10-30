@@ -4,9 +4,14 @@ import { io, Socket } from "socket.io-client";
 import { toast } from "sonner";
 import {
   appendTranscript,
+  setCodingCompleted,
+  setCodingStarted,
+  setCodingSubmissionState,
+  setCodingUnavailable,
   setCandidateDraft,
   setConnectionStatus,
   setPhase,
+  setSandboxExecutionPending,
   updateMediaTicks,
   updateSandboxOutput,
 } from "../slices/interviewSlice";
@@ -49,6 +54,7 @@ export const socketMiddleware: Middleware = (store) => {
         socket.on("connect", () => {
           store.dispatch(setConnectionStatus("connected"));
           audioDropWarningLogged = false;
+          socket?.emit("start_interview", { interviewId });
 
           if (messageQueue.length > 0) {
             messageQueue.forEach(({ event, data }) => {
@@ -96,6 +102,7 @@ export const socketMiddleware: Middleware = (store) => {
         );
 
         socket.on("interview:error", (error: { message: string }) => {
+          store.dispatch(setSandboxExecutionPending(false));
           console.error("Interview processing error:", error.message);
           toast.error(error.message);
         });
@@ -114,6 +121,93 @@ export const socketMiddleware: Middleware = (store) => {
           },
         );
 
+        socket.on(
+          "coding:started",
+          (payload: {
+            problemId: string;
+            title: string;
+            statement: string;
+            roleAlignment: string[];
+            skillAlignment: string[];
+            supportedLanguages: string[];
+            difficulty: "beginner" | "medium" | "hard" | "extreme";
+            examples: Array<{
+              input: string;
+              output: string;
+              explanation?: string;
+            }>;
+            constraints: string[];
+            functionSignature: string;
+            timeLimitSeconds: number;
+            timeLimitMinutes?: number;
+            allowedLanguages?: string[];
+            language?: string;
+            draft?: string;
+          }) => {
+            store.dispatch(
+              setCodingStarted({
+                assignment: {
+                  problemId: payload.problemId,
+                  title: payload.title,
+                  statement: payload.statement,
+                  roleAlignment: payload.roleAlignment ?? [],
+                  skillAlignment: payload.skillAlignment ?? [],
+                  supportedLanguages: payload.supportedLanguages ?? [],
+                  difficulty: payload.difficulty,
+                  examples: payload.examples ?? [],
+                  constraints: payload.constraints ?? [],
+                  functionSignature: payload.functionSignature ?? "",
+                  timeLimitSeconds: payload.timeLimitSeconds,
+                },
+                timeLimitSeconds:
+                  payload.timeLimitSeconds ??
+                  (payload.timeLimitMinutes ?? 0) * 60,
+                language: payload.language,
+                draft: payload.draft,
+                allowedLanguages: payload.allowedLanguages,
+              }),
+            );
+          },
+        );
+
+        socket.on(
+          "coding:completed",
+          (payload: {
+            reason?: string;
+            submissionStatus?: "attempted" | "solved" | "timed_out";
+            testSummary?: { passed: number; total: number };
+          }) => {
+            store.dispatch(
+              setCodingCompleted({
+                reason: payload.reason ?? payload.submissionStatus ?? "completed",
+                submissionStatus: payload.submissionStatus,
+                testSummary: payload.testSummary,
+              }),
+            );
+            toast.success(
+              payload.reason === "timed_out"
+                ? "Coding time ended. Your code was submitted."
+                : "Coding submission saved.",
+            );
+          },
+        );
+
+        socket.on("coding:submission_failed", (payload: { message?: string }) => {
+          store.dispatch(setCodingSubmissionState("failed"));
+          toast.error(payload.message ?? "Could not save your coding submission.");
+        });
+
+        socket.on(
+          "coding:unavailable",
+          (payload: { message?: string }) => {
+            store.dispatch(
+              setCodingUnavailable(
+                payload.message ?? "No coding assignment is available.",
+              ),
+            );
+          },
+        );
+
         socket.on("meyda_tick", (metrics: any) => {
           store.dispatch(updateMediaTicks(metrics));
         });
@@ -126,6 +220,7 @@ export const socketMiddleware: Middleware = (store) => {
             error?: string;
           }) => {
             store.dispatch(updateSandboxOutput(result));
+            store.dispatch(setSandboxExecutionPending(false));
           },
         );
       }
@@ -137,6 +232,10 @@ export const socketMiddleware: Middleware = (store) => {
           socket.off("connect");
           socket.off("disconnect");
           socket.off("phase_change");
+          socket.off("coding:started");
+          socket.off("coding:completed");
+          socket.off("coding:submission_failed");
+          socket.off("coding:unavailable");
           socket.off("ai_transcript");
           socket.off("stt:transcript");
           socket.off("interview:error");
@@ -150,6 +249,10 @@ export const socketMiddleware: Middleware = (store) => {
 
     if (action.type === "socket/emit") {
       const { event, data } = action.payload;
+
+      if (event === "sandbox_execute") {
+        store.dispatch(setSandboxExecutionPending(true));
+      }
 
       if (socket && socket.connected) {
         socket.emit(event, data);
