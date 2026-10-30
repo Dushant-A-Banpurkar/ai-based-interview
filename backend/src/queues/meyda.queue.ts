@@ -7,7 +7,10 @@ import { generateCandidateReport } from "../services/reportGenerator.service";
 import Redis from "ioredis";
 import * as dotenv from "dotenv";
 import { CandidateReportModel } from "../model/candidateReport.model";
-import { InterviewModel } from "../model/interview.model";
+import {
+  CodeSubmissionModel,
+  InterviewModel,
+} from "../model/interview.model";
 
 dotenv.config();
 
@@ -20,14 +23,21 @@ export interface TranscriptItem {
 }
 
 export interface CodeSubmissionItem {
-  language: string;
-  code: string;
-  sandboxResult: {
+  language?: string;
+  languageId?: number;
+  code?: string;
+  problemId?: string;
+  problemPrompt?: string;
+  submissionStatus?: "attempted" | "solved" | "timed_out";
+  executionStatus?: string;
+  testSummary?: { passed: number; total: number };
+  timeSpentSeconds?: number;
+  sandboxResult?: {
     stdout: string | null;
     stderr: string | null;
     status: { id: number; description: string };
   };
-  timestamp: number;
+  timestamp?: number;
 }
 
 async function getInterviewTranscript(
@@ -41,13 +51,28 @@ async function getInterviewTranscript(
 async function getCodeSubmissions(
   interviewId: string,
 ): Promise<CodeSubmissionItem[]> {
-  // FIXED: Now correctly reads from code key instead of transcript
-  const rawList = await redis.lrange(
-    `interview:${interviewId}:code`,
-    0,
-    -1,
+  const [rawList, durableSubmissions] = await Promise.all([
+    redis.lrange(`interview:${interviewId}:code`, 0, -1),
+    CodeSubmissionModel.find({ interviewId }).sort({ createdAt: 1 }).lean(),
+  ]);
+  const executionHistory = rawList.map(
+    (item) => JSON.parse(item) as CodeSubmissionItem,
   );
-  return rawList.map((item) => JSON.parse(item));
+  const finalSubmissions: CodeSubmissionItem[] = durableSubmissions.map(
+    (item) => ({
+      problemId: item.problemId,
+      problemPrompt: item.problemPrompt,
+      language: item.language,
+      languageId: item.languageId,
+      code: item.sourceCode,
+      submissionStatus: item.submissionStatus,
+      executionStatus: item.executionStatus,
+      testSummary: item.testSummary,
+      timeSpentSeconds: item.timeSpentSeconds,
+      timestamp: item.createdAt?.getTime() ?? 0,
+    }),
+  );
+  return [...executionHistory, ...finalSubmissions];
 }
 
 export async function processInterviewJob(interviewId: string) {
