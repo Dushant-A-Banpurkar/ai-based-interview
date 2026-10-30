@@ -1,9 +1,11 @@
-export type DifficultyMode = "beginner" | "intermediate" | "advanced";
+export type InterviewDifficulty = "beginner" | "medium" | "hard" | "extreme";
 
 export interface CodingAssignmentContext {
   roleTitle: string;
   targetSkills: string[];
-  difficultyMode: DifficultyMode;
+  jobDescription: string;
+  difficultyMode: InterviewDifficulty;
+  allowedLanguages: string[];
   codingTimeLimitSeconds: number;
 }
 
@@ -13,7 +15,8 @@ export interface CodingAssignmentPublic {
   statement: string;
   roleAlignment: string[];
   skillAlignment: string[];
-  difficulty: DifficultyMode;
+  supportedLanguages: string[];
+  difficulty: InterviewDifficulty;
   examples: Array<{ input: string; output: string; explanation?: string }>;
   constraints: string[];
   functionSignature: string;
@@ -28,5 +31,4 @@ export interface PrivateTestCase {
 export interface StoredCodingAssignment {
   public: CodingAssignmentPublic;
   privateTests: PrivateTestCase[];
-  referenceSolution?: Record<string, string>;
 }
