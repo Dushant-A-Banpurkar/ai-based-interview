@@ -2,7 +2,7 @@
 
 AI-based Interview is an experimental interview-preparation project. It is intended to let a candidate practice a role-specific interview, optionally using a resume and job description to shape the session, then review an AI-generated evaluation.
 
-The repository contains a TypeScript/Express backend and a Next.js frontend. The backend uses MongoDB for interview data, Redis and BullMQ for real-time and background work, Socket.IO for live communication, and external AI, speech-to-text, and code-execution services. The frontend includes interview setup, live-session, coding, and report components; the product and its end-to-end integration are still under active development.
+The repository contains a TypeScript/Express backend and a Next.js frontend. The backend uses MongoDB for durable interview and submission data, Redis and BullMQ for live and background work, Socket.IO for the interview session, and external AI, speech-to-text, and code-execution services. The interview page includes live transcription and a coding exercise with separate Run and Submit actions. The project is experimental and still requires production hardening.
 
 ## Capabilities
 
@@ -10,10 +10,11 @@ The repository contains a TypeScript/Express backend and a Next.js frontend. The
 - Stream audio over Socket.IO and request live transcription through Deepgram.
 - Generate contextual interviewer follow-up questions from candidate transcripts using OpenAI, with Gemini as a fallback.
 - Collect audio-derived telemetry in the browser and store session telemetry in Redis.
-- Run submitted code through Judge0 when sandbox execution is enabled.
-- Generate an interview evaluation with OpenAI and persist it in MongoDB.
+- Select and persist coding assignments based on interview role, target skills, difficulty, allowed languages, and remaining time. Fifteen-minute interviews do not receive assignments.
+- Save coding drafts and final submissions durably. A final submission is marked solved only when all server-side assignment tests pass; individual Run results do not determine the final outcome.
+- Generate an interview evaluation with OpenAI and persist it in MongoDB. Reports include both Redis execution history and durable final submissions.
 
-Some of these paths are not yet wired end to end. See [Current implementation notes](#current-implementation-notes) before relying on the UI or report pipeline.
+The coding UI and backend socket flow are connected, but the service integrations and interview/report lifecycle still need end-to-end testing in a configured environment. See [Current implementation notes](#current-implementation-notes).
 
 New to the codebase or preparing to explain it in an interview? Start with the [Project Study Guide](STUDY_GUIDE.md), which walks through the architecture, key files, live audio flow, and known limitations.
 
@@ -36,7 +37,7 @@ backend/
     database/         MongoDB connection
     queues/           BullMQ queues and recording storage
     routes/           Express routes
-    services/         Report and code-execution services
+    services/         Interview, assignment, submission, and report services
     socket/           Socket.IO handlers
     workers/          Background processing
     test/             Backend tests
@@ -56,7 +57,7 @@ frontend/
 - API credentials for the external services you intend to use:
   - OpenAI or Gemini for live interviewer responses; OpenAI is also used for evaluation reports.
   - Deepgram for live speech transcription.
-  - Judge0 RapidAPI for code execution.
+  - Judge0-compatible service for code execution and private-test verification. Set `JUDGE0_URL` to the URL reachable from the backend.
   - AWS credentials, region, and an S3 bucket if using recording storage.
 - A modern browser with microphone access for the live interview experience.
 
@@ -89,6 +90,7 @@ GEMINI_API_KEY=your-gemini-api-key
 GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
 DEEPGRAM_API_KEY=your-deepgram-api-key
 JUDGE0_API_KEY=your-judge0-rapidapi-key
+JUDGE0_URL=http://localhost:2358
 
 AWS_REGION=your-aws-region
 S3_Bucket_NAME=your-s3-bucket-name
@@ -105,7 +107,8 @@ S3_Bucket_NAME=your-s3-bucket-name
 | `GEMINI_BASE_URL` | Gemini-compatible API | Optional; defaults to Google's OpenAI-compatible Generative Language API endpoint. |
 | `GEMINI_INTERVIEW_MODEL` | Live interviewer fallback | Optional model override; defaults to `gemini-3.5-flash-lite`. Confirm that the model is available to your Gemini API account. |
 | `DEEPGRAM_API_KEY` | Speech transcription | Used by the Socket.IO interview handler. Backend startup checks that this value is present. |
-| `JUDGE0_API_KEY` | Code execution | Judge0 is accessed through the RapidAPI endpoint. |
+| `JUDGE0_URL` | Sandbox and assignment tests | Optional; defaults to `http://localhost:2358`. Must be reachable from the backend. |
+| `JUDGE0_API_KEY` | RapidAPI-hosted Judge0, if used | The current socket handler sends requests to `JUDGE0_URL`; configure any required provider headers if using a hosted service. |
 | `AWS_REGION`, `S3_Bucket_NAME` | Recording storage | AWS SDK credentials must also be available through the standard AWS credential chain (for example, environment credentials or an assigned role). |
 
 Deepgram is required for live speech transcription. Configure at least one interviewer AI provider (`OPENAI_API_KEY` or `GEMINI_API_KEY`); if both are configured, Gemini is tried when OpenAI fails. A provider HTTP 429 generally means the account is rate-limited or out of quota—check that provider's usage, billing, and model access. OpenAI, Judge0, and AWS credentials are feature-specific; configure them for the features you use. MongoDB is required for the API to start, and Redis is required for real-time/queue features.
@@ -157,13 +160,7 @@ docker compose up --build
 
 The frontend is built from its Docker image without a host bind mount, keeping `.next` inside the container and avoiding host/container ownership conflicts. Although the frontend Dockerfile sets `USER node`, the current Compose service explicitly overrides that user to `root`; remove that override if you want Compose to run the container as the non-root image user. Rebuild the frontend image after changing frontend source. The backend source is bind-mounted for development.
 
-Background processing runs in a separate process. Keep the API server running in one terminal, then start the report worker from the backend directory in another:
-
-```sh
-npx tsx watch src/workers/interview.worker.ts
-```
-
-The report worker requires Redis and an AI provider API key. However, the report queue is not currently connected end to end: ending an interview enqueues a job on `interview-process`, while `src/workers/interview.worker.ts` listens on `interview-processing-queue`. The worker process can start, but it will not consume those report jobs until the queue names are aligned. The separate recording worker in `src/queues/interview.queue.ts` uses `interview-processing` and requires AWS/S3 configuration.
+The report worker is loaded by the backend after MongoDB connects and consumes the `interview-process` queue. The separate recording worker in `src/queues/interview.queue.ts` uses `interview-processing` and requires AWS/S3 configuration.
 
 ## Usage
 
@@ -171,7 +168,7 @@ The intended workflow is:
 
 1. Create a session with the role title and job description; optionally include a resume PDF, target skills, interview difficulty, and allowed coding languages.
 2. Open the session setup screen, allow microphone access, and establish the Socket.IO connection.
-3. Complete the live interview and coding exercise.
+3. During the live interview, start the coding exercise when the backend makes it available. The assignment and countdown are server-controlled; Run Code executes a sample input and Submit sends the final editor contents.
 4. End the session and view its report after background evaluation finishes.
 
 The backend currently exposes these HTTP routes:
@@ -192,7 +189,7 @@ Example health check:
 curl http://localhost:5000/health
 ```
 
-The frontend is not yet a complete application flow. In particular, the root page is currently a placeholder, and the UI's authentication/dashboard and interview creation routes should not be assumed to work with the backend without further integration.
+The frontend is still experimental. Authentication and dashboard behavior are not production-ready, and external services must be configured for a complete live session.
 
 ## Development and tests
 
@@ -217,10 +214,11 @@ npm run lint
 
 ## Current implementation notes
 
-- The frontend and backend currently disagree on some API paths and environment-variable fallbacks. Confirm and align these before using the frontend as an end-to-end client.
-- Interview-status route handling is unfinished: the route parameter name and controller validation do not currently agree.
-- Report jobs are added to the `interview-process` queue, but `src/workers/interview.worker.ts` consumes `interview-processing-queue`; align these names before expecting reports to be generated. The recording worker uses a third queue name, `interview-processing`.
-- Authentication, dashboard behavior, interview lifecycle, and recording/report delivery are still evolving. Treat this project as an experiment rather than a production-ready interview or hiring system.
+- Coding assignments currently come from a small curated bank, not AI-generated content. Its relevance depends on the bank's role/skill metadata; unsupported or unmatched target skills can result in no assignment.
+- Supported execution languages are JavaScript, Python, and C++. The backend enforces the saved `allowedLanguages` and `enableSandbox` settings.
+- Final submissions are stored in MongoDB and remain `attempted` or `timed_out` unless every private test passes. Judge0 availability is required to verify a submitted solution.
+- Report jobs and the report worker use the same `interview-process` queue. Report generation still depends on Redis, MongoDB, and an available AI provider; test that flow with configured services before relying on it.
+- The project is a practice tool, not a validated hiring assessment. Authentication, operational monitoring, external-service reliability, and full end-to-end coverage need further work.
 
 ## Contributing
 
