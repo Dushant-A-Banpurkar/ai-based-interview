@@ -26,7 +26,7 @@ You are an expert technical interviewer and speech dynamics analyst. Your task i
 
 You will be provided with three data streams from the interview session:
 1. **TRANSCRIPT**: Timestamps, interviewer questions, and candidate responses.
-2. **CODE_SUBMISSIONS**: The candidate's source code, target language, and execution results from a sandboxed runner (stdout, stderr, pass/fail status).
+2. **CODE_SUBMISSIONS**: Sandbox execution history plus durable final submissions, including assignment ID, language, final status (attempted, timed_out, or solved), verification status, and private-test summary. Do not infer correctness from a successful individual sandbox run; only a verified "solved" final status indicates all required assignment tests passed.
 3. **AUDIO_TELEMETRY**: Aggregated Meyda feature metrics calculated from the candidate's live audio:
    - RMS (Root Mean Square): Measures signal loudness and energy volume.
    - Spectral Centroid: Indicates "brightness" of sound (higher values correlate with higher pitch / sharp emphasis; sudden drops indicate slurring/muttering).
@@ -63,7 +63,7 @@ export async function generateCandidateReport(
     ${JSON.stringify(data.transcript, null, 2)}
     
     ### CODE_SUBMISSIONS
-    ${(JSON.stringify(data.codeSubmissions), null, 2)}
+    ${JSON.stringify(data.codeSubmissions, null, 2)}
     
     ### AUDIO_TELEMETRY
     ${(JSON.stringify(data.audioTelemetryAverage), null, 2)}`;
@@ -88,7 +88,10 @@ export async function generateCandidateReport(
     );
     const chatcompletion = await gemini.chat.completions.create({
       model: "gemini-3.5-flash-lite",
-      messages: [{ role: "user", content: system_prompt }],
+      messages: [
+        { role: "system", content: system_prompt },
+        { role: "user", content: userContent },
+      ],
       temperature: 0.2,
       response_format: { type: "json_object" },
     });
