@@ -2,6 +2,10 @@ import * as dotenv from "dotenv";
 import Redis from "ioredis";
 import OpenAI from "openai";
 import { CandidateReportModel } from "../model/candidateReport.model";
+import {
+  CodeSubmissionModel,
+  InterviewModel,
+} from "../model/interview.model";
 import { Job, Worker } from "bullmq";
 
 dotenv.config();
@@ -12,12 +16,18 @@ const redisClient = new Redis(process.env.REDIS_URL!, {
 const bullmqRedisClient = new Redis(process.env.REDIS_URL!, {
   maxRetriesPerRequest: null,
 });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
-export const gemini = new OpenAI({
-  baseURL: process.env.GEMINI_BASE_URL,
-  apiKey: process.env.GEMINI_API_KEY,
-});
+export const gemini = process.env.GEMINI_API_KEY
+  ? new OpenAI({
+      baseURL:
+        process.env.GEMINI_BASE_URL ||
+        "https://generativelanguage.googleapis.com/v1beta/openai/",
+      apiKey: process.env.GEMINI_API_KEY,
+    })
+  : null;
 
 interface RawMeydaFrame {
   rms: number;
@@ -60,15 +70,31 @@ export async function processInterviewJob(interviewId: string) {
     `[Worker] Starting report generation for interview: ${interviewId}`,
   );
 
-  const [rawTelemetry, rawTranscript, rawCode] = await Promise.all([
-    redisClient.lrange(`interview:${interviewId}:telemetry`, 0, -1),
-    redisClient.lrange(`interview:${interviewId}:transcript`, 0, -1),
-    redisClient.lrange(`interview:${interviewId}:code`, 0, -1),
-  ]);
+  const [rawTelemetry, rawTranscript, rawCode, durableSubmissions] =
+    await Promise.all([
+      redisClient.lrange(`interview:${interviewId}:telemetry`, 0, -1),
+      redisClient.lrange(`interview:${interviewId}:transcript`, 0, -1),
+      redisClient.lrange(`interview:${interviewId}:code`, 0, -1),
+      CodeSubmissionModel.find({ interviewId }).sort({ createdAt: 1 }).lean(),
+    ]);
 
   const frames: RawMeydaFrame[] = rawTelemetry.map((item) => JSON.parse(item));
   const transcript = rawTranscript.map((t) => JSON.parse(t));
-  const codeSubmissions = rawCode.map((c) => JSON.parse(c));
+  const codeSubmissions = [
+    ...rawCode.map((c) => JSON.parse(c)),
+    ...durableSubmissions.map((submission) => ({
+      problemId: submission.problemId,
+      problemPrompt: submission.problemPrompt,
+      language: submission.language,
+      languageId: submission.languageId,
+      code: submission.sourceCode,
+      submissionStatus: submission.submissionStatus,
+      executionStatus: submission.executionStatus,
+      testSummary: submission.testSummary,
+      timeSpentSeconds: submission.timeSpentSeconds,
+      timestamp: submission.createdAt?.getTime() ?? 0,
+    })),
+  ];
 
   const audioTelemetrySummary = aggregateMeydaTelemetry(frames);
 
@@ -78,6 +104,7 @@ Evaluate this technical interview session:
 - Acoustic Delivery Summary (Meyda RMS/Centroid/ZCR avg): ${JSON.stringify(audioTelemetrySummary)}
 - Transcript History: ${JSON.stringify(transcript)}
 - Final Code Submissions: ${JSON.stringify(codeSubmissions)}
+- Outcomes are distinct: attempted, timed_out, and solved. Only a final "solved" outcome with all private tests passing is verified correct; an individual sandbox run is not proof of correctness.
 
 Return a JSON object conforming strictly to this structure:
 {
@@ -109,6 +136,7 @@ Return a JSON object conforming strictly to this structure:
   let parsedReport;
 
   try {
+    if (!openai) throw new Error("OPENAI_API_KEY is not configured.");
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -122,6 +150,12 @@ Return a JSON object conforming strictly to this structure:
     console.warn(
       `[Worker] OpenAI failed (${openaiError.message}). Switching to Gemini for interview report...`,
     );
+    if (!gemini) {
+      throw new Error(
+        "Report generation requires GEMINI_API_KEY when OpenAI is unavailable.",
+        { cause: openaiError },
+      );
+    }
     const completion = await gemini.chat.completions.create({
       model: "gemini-3.5-flash-lite",
       messages: [
@@ -137,20 +171,26 @@ Return a JSON object conforming strictly to this structure:
   const savedReport = await CandidateReportModel.create({
     interviewId,
     overallScore: parsedReport.overallScore ?? 50,
-    recommendation: parsedReport.recommendation ?? "Reject",
+    recommendation: parsedReport.recommendation ?? "No Hire",
     executiveSummary: parsedReport.executiveSummary ?? "",
-    technicalEvaluation: parsedReport.teachnicalEvaluation,
+    technicalEvaluation: parsedReport.technicalEvaluation,
     communicationEvaluation: parsedReport.communicationEvaluation,
     redFlags: parsedReport.redFlags ?? [],
     questionBreakdown: parsedReport.questionBreakdown ?? [],
   });
 
+  await InterviewModel.findByIdAndUpdate(interviewId, { status: "completed" });
+  await redisClient.del(
+    `interview:${interviewId}:telemetry`,
+    `interview:${interviewId}:transcript`,
+    `interview:${interviewId}:code`,
+  );
   console.log(`[Worker] Report generation finished for: ${interviewId}`);
   return savedReport;
 }
 
 export const interviewWorker = new Worker(
-  "interview-processing-queue",
+  "interview-process",
   async (job: Job<{ interviewId: string }>) => {
     return await processInterviewJob(job.data.interviewId);
   },
