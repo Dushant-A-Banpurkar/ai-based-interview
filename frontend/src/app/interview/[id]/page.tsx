@@ -55,7 +55,7 @@ export default function LiveInterviewPage({ params }: PageProps) {
     <div className="flex h-screen w-full bg-slate-950 text-slate-100 overflow-hidden selection:bg-blue-500/20">
       <div className="w-1/2 border-r border-slate-800 p-6 flex flex-col bg-slate-950">
         <header className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+          <h2 className="text-xl font-semibold bg-linear-to-r from-white to-slate-400 bg-clip-text text-transparent">
             Session ID:{" "}
             <span className="font-mono text-base text-slate-400">
               {interviewId}
