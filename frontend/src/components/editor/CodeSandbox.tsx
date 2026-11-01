@@ -266,7 +266,7 @@ export default function CodeSandbox() {
         </div>
       </div>
 
-      <div className="relative min-h-[220px] w-full flex-1 bg-slate-950">
+      <div className="relative min-h-55 w-full flex-1 bg-slate-950">
         <Editor
           height="100%"
           theme="vs-dark"
