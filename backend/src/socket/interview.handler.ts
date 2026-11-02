@@ -262,6 +262,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
     if (!lastInterviewerQuestion) return;
 
     questionRepeatTimer = setTimeout(() => {
+      questionRepeatTimer = null;
       const repeatedQuestion = `I haven't heard a response yet. Let me repeat the question: ${lastInterviewerQuestion}`;
       io.to(interviewId).emit("ai_transcript", {
         role: "ai",
@@ -283,7 +284,6 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
             error,
           );
         });
-      scheduleQuestionRepeat();
     }, 12000);
   };
 
