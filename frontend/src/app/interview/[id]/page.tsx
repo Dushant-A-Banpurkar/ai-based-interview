@@ -2,6 +2,7 @@
 
 import CodeSandbox from "@/src/components/editor/CodeSandbox";
 import AudioVisualizer from "@/src/components/interview/AudioVisualizer";
+import { useInterviewStatus } from "@/src/hooks/useInterviewStatus";
 import { useMeydaTelemetry } from "@/src/hooks/useMeydaTelemetry";
 import {
   selectCandidateDraft,
@@ -17,7 +18,7 @@ import {
   setCodingStartRequested,
   setTargetSession,
 } from "@/src/store/slices/interviewSlice";
-import React, { use, useEffect } from "react";
+import React, { use, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 interface PageProps {
@@ -27,6 +28,7 @@ interface PageProps {
 export default function LiveInterviewPage({ params }: PageProps) {
   const { id: interviewId } = use(params);
 
+  const { data: interviewData } = useInterviewStatus(interviewId);
   const dispatch = useDispatch();
   const phase = useSelector(selectInterviewPhase);
   const transcript = useSelector(selectTranscript);
@@ -38,6 +40,16 @@ export default function LiveInterviewPage({ params }: PageProps) {
   const codingUnavailableMessage = useSelector(
     selectCodingUnavailableMessage,
   );
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const initialTimerId = setTimeout(() => setNow(Date.now()), 0);
+    const intervalId = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearTimeout(initialTimerId);
+      clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     if (interviewId) {
@@ -50,6 +62,26 @@ export default function LiveInterviewPage({ params }: PageProps) {
   }, [dispatch, interviewId]);
 
   const { isListening, error: micError } = useMeydaTelemetry({ enabled: true });
+  const startedAt = interviewData?.interviewStartedAt
+    ? Date.parse(interviewData.interviewStartedAt)
+    : null;
+  const remainingSeconds =
+    now !== null &&
+    startedAt !== null &&
+    Number.isFinite(startedAt) &&
+    interviewData
+      ? Math.max(
+          0,
+          interviewData.durationMinutes * 60 -
+            Math.floor((now - startedAt) / 1000),
+        )
+      : null;
+  const formattedRemainingTime =
+    remainingSeconds === null
+      ? "Waiting to start"
+      : `${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(
+          remainingSeconds % 60,
+        ).padStart(2, "0")}`;
 
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-100 overflow-hidden selection:bg-blue-500/20">
@@ -61,17 +93,30 @@ export default function LiveInterviewPage({ params }: PageProps) {
               {interviewId}
             </span>
           </h2>
-          <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-full px-3 py-1.5 shadow-inner">
-            <span
-              className={`h-2.5 w-2.5 rounded-full shadow-lg transition-all duration-300 ${
-                isListening
-                  ? "bg-emerald-500 animate-pulse shadow-emerald-500/50"
-                  : "bg-red-500 shadow-red-500/50"
+          <div className="flex items-center gap-3">
+            <div
+              aria-live="off"
+              aria-label={`Interview time remaining: ${formattedRemainingTime}`}
+              className={`rounded-full border px-3 py-1.5 font-mono text-xs font-medium tabular-nums ${
+                remainingSeconds !== null && remainingSeconds <= 5 * 60
+                  ? "border-red-500/40 bg-red-950/30 text-red-300"
+                  : "border-slate-800 bg-slate-900/60 text-slate-300"
               }`}
-            />
-            <span className="text-xs font-mono text-slate-300 font-medium">
-              {isListening ? "Mic Live (Meyda Active)" : "Mic Inactive"}
-            </span>
+            >
+              Time left: {formattedRemainingTime}
+            </div>
+            <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-full px-3 py-1.5 shadow-inner">
+              <span
+                className={`h-2.5 w-2.5 rounded-full shadow-lg transition-all duration-300 ${
+                  isListening
+                    ? "bg-emerald-500 animate-pulse shadow-emerald-500/50"
+                    : "bg-red-500 shadow-red-500/50"
+                }`}
+              />
+              <span className="text-xs font-mono text-slate-300 font-medium">
+                {isListening ? "Mic Live (Meyda Active)" : "Mic Inactive"}
+              </span>
+            </div>
           </div>
         </header>
 
