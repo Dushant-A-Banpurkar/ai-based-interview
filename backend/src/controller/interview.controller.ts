@@ -178,7 +178,7 @@ export async function getInterviewStatus(
 
     const interview = await InterviewModel.findById(
       interviewId,
-      "status roleTitle createdAt",
+      "status roleTitle createdAt durationMinutes interviewStartedAt",
     );
     if (!interview) {
       res.status(404).json({ error: "Interview session not found." });
@@ -189,6 +189,9 @@ export async function getInterviewStatus(
       message: "Successfully fetch interview status",
       interviewId: interview._id,
       status: interview.status,
+      roleTitle: interview.roleTitle,
+      durationMinutes: interview.durationMinutes,
+      interviewStartedAt: interview.interviewStartedAt,
     });
   } catch (error: any) {
     console.error("Error in getInterviewStatus: ", error.message);
