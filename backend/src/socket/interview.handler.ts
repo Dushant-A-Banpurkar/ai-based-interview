@@ -3,7 +3,6 @@ import { DeepgramClient } from "@deepgram/sdk";
 import { VoiceMetricsSchema } from "../schemas/interviewSocket.schema";
 import * as dotenv from "dotenv";
 import Redis from "ioredis";
-import axios from "axios";
 import type {
   CodingContext,
   InterviewPromptContext,
@@ -20,17 +19,14 @@ import {
 } from "../services/codingAssignment.service";
 import type { StoredCodingAssignment } from "../types/codingAssignment";
 import { finalizeCodingSubmission } from "../services/codingSubmission.service";
+import {
+  INTERVIEW_CLOSING_RESERVE_SECONDS,
+  registerCodingHandlers,
+} from "./interviewCoding.handler";
 
 dotenv.config();
 
 const redis = new Redis(process.env.REDIS_URL!);
-const JUDGE0_API_URL = process.env.JUDGE0_URL || "http://localhost:2358";
-const JUDGE0_LANGUAGE_MAP: Record<string, number> = {
-  javascript: 63,
-  python: 71,
-  cpp: 54,
-};
-const INTERVIEW_CLOSING_RESERVE_SECONDS = 5 * 60;
 const interviewCodingFinalizers = new Map<
   string,
   Set<() => Promise<void>>
@@ -400,6 +396,67 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   finalizers.add(finalizeOnInterviewEnd);
   interviewCodingFinalizers.set(interviewId, finalizers);
 
+  registerCodingHandlers({
+    io,
+    socket,
+    interviewId,
+    redis,
+    get interviewDurationMinutes() {
+      return interviewDurationMinutes;
+    },
+    get interviewStartedAt() {
+      return interviewStartedAt;
+    },
+    get codingAssignment() {
+      return codingAssignment;
+    },
+    get allowedLanguages() {
+      return allowedLanguages;
+    },
+    get enableSandbox() {
+      return enableSandbox;
+    },
+    get codingActive() {
+      return codingActive;
+    },
+    set codingActive(value: boolean) {
+      codingActive = value;
+    },
+    get codingFinishing() {
+      return codingFinishing;
+    },
+    get phaseVersion() {
+      return phaseVersion;
+    },
+    set phaseVersion(value: number) {
+      phaseVersion = value;
+    },
+    get latestCode() {
+      return latestCode;
+    },
+    set latestCode(value: string) {
+      latestCode = value;
+    },
+    get latestLanguage() {
+      return latestLanguage;
+    },
+    set latestLanguage(value: string) {
+      latestLanguage = value;
+    },
+    get pendingTranscriptSegments() {
+      return pendingTranscriptSegments;
+    },
+    get pendingSpeechDuringCoding() {
+      return pendingSpeechDuringCoding;
+    },
+    set pendingSpeechDuringCoding(value: boolean) {
+      pendingSpeechDuringCoding = value;
+    },
+    clearQuestionRepeatTimer,
+    scheduleCodingTimeout,
+    finishCoding,
+  });
+
   // 1. Register socket listeners immediately so early events are not missed
   socket.on("audio:stream", (rawChunk: unknown) => {
     const chunk = toPcmBuffer(rawChunk);
@@ -629,313 +686,11 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
     scheduleQuestionRepeat();
   });
 
-  socket.on("start_coding", async () => {
-    if (codingActive || codingFinishing) return;
-    if (!codingAssignment) {
-      io.to(interviewId).emit("coding:unavailable", {
-        message: "No coding assignment is available for this interview.",
-      });
-      return;
-    }
-
-    try {
-      const initialInterview = await InterviewModel.findById(interviewId);
-      if (!initialInterview || initialInterview.codingStatus === "completed") {
-        io.to(interviewId).emit("coding:unavailable", {
-          message: "This coding assignment has already been completed.",
-        });
-        return;
-      }
-
-      const interviewTimeRemaining =
-        interviewDurationMinutes === null || interviewStartedAt === null
-          ? 0
-          : Math.max(
-              0,
-              interviewDurationMinutes * 60 -
-                Math.floor((Date.now() - interviewStartedAt) / 1000) -
-                INTERVIEW_CLOSING_RESERVE_SECONDS,
-            );
-      if (
-        initialInterview.codingStatus === "not_started" &&
-        interviewTimeRemaining < codingAssignment.public.timeLimitSeconds
-      ) {
-        io.to(interviewId).emit("coding:unavailable", {
-          message:
-            "There is not enough interview time to start the coding assignment and reserve time for closing.",
-        });
-        return;
-      }
-
-      const startedAt = new Date();
-      if (pendingTranscriptSegments.length > 0) {
-        pendingSpeechDuringCoding = true;
-      }
-      await InterviewModel.updateOne(
-        { _id: interviewId, codingStatus: "not_started" },
-        {
-          $set: {
-            codingStatus: "active",
-            codingStartedAt: startedAt,
-            codingDraft: "",
-            codingLanguage: allowedLanguages.includes("javascript")
-              ? "javascript"
-              : allowedLanguages[0],
-          },
-        },
-      );
-
-      const interview = await InterviewModel.findById(interviewId);
-      if (!interview || interview.codingStatus === "completed") {
-        io.to(interviewId).emit("coding:unavailable", {
-          message: "This coding assignment has already been completed.",
-        });
-        return;
-      }
-
-      codingActive = true;
-      phaseVersion += 1;
-      latestCode = interview.codingDraft ?? "";
-      latestLanguage = interview.codingLanguage ?? "javascript";
-      const actualStart = interview.codingStartedAt ?? startedAt;
-      const codingTimeRemaining = Math.max(
-        0,
-        codingAssignment.public.timeLimitSeconds -
-          Math.floor((Date.now() - actualStart.getTime()) / 1000),
-      );
-      const remainingSeconds = Math.min(
-        codingTimeRemaining,
-        interviewTimeRemaining,
-      );
-      clearQuestionRepeatTimer();
-
-      io.to(interviewId).emit("phase_change", "live_coding");
-      io.to(interviewId).emit("coding:started", {
-        ...toClientAssignment(codingAssignment),
-        prompt: codingAssignment.public.statement,
-        timeLimitSeconds: remainingSeconds,
-        timeLimitMinutes: Math.ceil(remainingSeconds / 60),
-        allowedLanguages,
-        language: latestLanguage,
-        draft: latestCode,
-      });
-
-      scheduleCodingTimeout(remainingSeconds);
-    } catch (error) {
-      console.error(`Failed to start coding for interview ${interviewId}:`, error);
-      io.to(interviewId).emit("interview:error", {
-        message: "Could not start the coding assignment.",
-      });
-    }
-  });
-
   socket.on("audio:telemetry", (rawPayload) => {
     const parse = VoiceMetricsSchema.safeParse(rawPayload);
     if (!parse.success) return;
   });
 
-  socket.on(
-    "coding_draft",
-    async (payload: { language?: string; code?: string } | null) => {
-      if (
-        !codingActive ||
-        !payload ||
-        typeof payload.code !== "string" ||
-        payload.code.length > 100_000 ||
-        typeof payload.language !== "string"
-      ) {
-        socket.emit("interview:error", {
-          message: "Invalid coding draft.",
-        });
-        return;
-      }
-
-      const language = normalizeCodingLanguage(payload.language);
-      if (!allowedLanguages.includes(language) || !JUDGE0_LANGUAGE_MAP[language]) {
-        socket.emit("interview:error", {
-          message: "This language is not allowed for the coding assignment.",
-        });
-        return;
-      }
-
-      try {
-        const saved = await InterviewModel.updateOne(
-          { _id: interviewId, codingStatus: "active" },
-          {
-            $set: {
-              codingDraft: payload.code,
-              codingLanguage: language,
-            },
-          },
-        );
-        if (saved.matchedCount !== 1) {
-          socket.emit("interview:error", {
-            message: "There is no active coding assignment.",
-          });
-          return;
-        }
-        latestCode = payload.code;
-        latestLanguage = language;
-      } catch (error) {
-        console.error(
-          `Failed to persist coding draft for interview ${interviewId}:`,
-          error,
-        );
-        socket.emit("interview:error", {
-          message: "Could not save the coding draft.",
-        });
-      }
-    },
-  );
-
-  socket.on(
-    "sandbox_execute",
-    async (payload: {
-      interviewId?: string;
-      language?: string;
-      code?: string;
-    } | null) => {
-      if (!payload) {
-        socket.emit("interview:error", {
-          message: "Invalid code execution request.",
-        });
-        return;
-      }
-      const { language, code } = payload;
-      const normalizedLanguage =
-        typeof language === "string"
-          ? normalizeCodingLanguage(language)
-          : undefined;
-      const languageId = normalizedLanguage
-        ? JUDGE0_LANGUAGE_MAP[normalizedLanguage]
-        : undefined;
-      if (!enableSandbox) {
-        socket.emit("interview:error", {
-          message: "Code execution is disabled for this interview.",
-        });
-        return;
-      }
-      if (
-        !codingActive ||
-        typeof code !== "string" ||
-        code.length > 100_000 ||
-        !normalizedLanguage ||
-        !allowedLanguages.includes(normalizedLanguage) ||
-        !languageId
-      ) {
-        socket.emit("interview:error", {
-          message: "The code or language is not allowed for this interview.",
-        });
-        return;
-      }
-
-      latestCode = code;
-      latestLanguage = normalizedLanguage;
-      try {
-        const saved = await InterviewModel.updateOne(
-          { _id: interviewId, codingStatus: "active" },
-          {
-            $set: {
-              codingDraft: code,
-              codingLanguage: normalizedLanguage,
-            },
-          },
-        );
-        if (saved.matchedCount !== 1) {
-          socket.emit("interview:error", {
-            message: "There is no active coding assignment.",
-          });
-          return;
-        }
-        const submissionResponse = await axios.post(
-          `${JUDGE0_API_URL}/submissions?base64_encoded=false&wait=true`,
-          {
-            source_code: code,
-            language_id: languageId,
-            stdin: codingAssignment?.public.examples[0]?.input ?? "",
-          },
-          { timeout: 20_000 },
-        );
-        const { stdout, stderr, compile_output, message, status } =
-          submissionResponse.data;
-
-        const finalStdout = stdout || null;
-        const finalStderr = stderr || compile_output || message || null;
-
-        socket.emit("sandbox_result", {
-          stdout: finalStdout,
-          stderr: finalStderr,
-          status: {
-            id: status?.id ?? -1,
-            description: status?.description ?? "Unknown",
-          },
-        });
-
-        await redis.rpush(
-          `interview:${interviewId}:code`,
-          JSON.stringify({
-            language,
-            code,
-            sandboxResult: {
-              stdout: finalStdout,
-              stderr: finalStderr,
-              status: {
-                id: status?.id ?? -1,
-                description: status?.description ?? "Unknown",
-              },
-            },
-            timestamp: Date.now(),
-          }),
-        );
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : "Unknown execution error";
-        console.error("Judge0 Execution Error:", message);
-        socket.emit("sandbox_result", {
-          stdout: null,
-          stderr: `Execution System Error: ${message}`,
-          error: "Execution failed",
-        });
-      }
-    },
-  );
-  socket.on(
-    "submit_coding",
-    async (payload: { language?: string; code?: string } | null) => {
-      if (
-        !codingActive ||
-        !payload ||
-        typeof payload.code !== "string" ||
-        payload.code.length > 100_000 ||
-        typeof payload.language !== "string"
-      ) {
-        socket.emit("coding:submission_failed", {
-          message: "There is no valid active coding submission to save.",
-        });
-        io.to(interviewId).emit("interview:error", {
-          message: "There is no valid active coding submission to save.",
-        });
-        return;
-      }
-
-      try {
-        latestCode = payload.code;
-        latestLanguage = normalizeCodingLanguage(payload.language);
-        await finishCoding("submitted", payload.code, payload.language);
-      } catch (error: unknown) {
-        console.error(
-          `Failed to save coding submission for interview ${interviewId}:`,
-          error,
-        );
-        socket.emit("coding:submission_failed", {
-          message: "Could not save the coding submission. Please try again.",
-        });
-        io.to(interviewId).emit("interview:error", {
-          message: "Could not save the coding submission.",
-        });
-      }
-    },
-  );
   socket.on("disconnect", () => {
     finalizers.delete(finalizeOnInterviewEnd);
     if (finalizers.size === 0) interviewCodingFinalizers.delete(interviewId);
