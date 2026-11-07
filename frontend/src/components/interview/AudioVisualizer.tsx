@@ -33,7 +33,7 @@ export default function Audio() {
               }}
               className={`w-full rounded-full transition-all duration-75 ease-out ${
                 volumePercentage > 12
-                  ? "bg-gradient-to-t from-emerald-600 to-emerald-400 opacity-100 shadow-[0_0_4px_rgba(52,211,153,0.2)]"
+                  ? "bg-linear-to-t from-emerald-600 to-emerald-400 opacity-100 shadow-[0_0_4px_rgba(52,211,153,0.2)]"
                   : "bg-slate-700 opacity-40"
               }`}
             />
