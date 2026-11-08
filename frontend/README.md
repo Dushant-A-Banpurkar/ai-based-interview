@@ -55,4 +55,6 @@ npm run build
 The Redux Socket.IO middleware is in `src/store/middleware/socketMiddleware.ts`;
 interview/coding state is in `src/store/slices/interviewSlice.ts`; and the live
 interview and editor UI are in `src/app/interview/[id]/page.tsx` and
-`src/components/editor/CodeSandbox.tsx`.
+`src/components/editor/CodeSandbox.tsx`. On the backend, interview events are
+registered in `backend/src/socket/interview.handler.ts`, while coding events
+are registered in `backend/src/socket/interviewCoding.handler.ts`.
