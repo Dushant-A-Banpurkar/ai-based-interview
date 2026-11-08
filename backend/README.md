@@ -91,7 +91,7 @@ The response includes the created `interviewId`. Use it in the session routes an
 
 ## Live interview and coding
 
-The Socket.IO server handles live interview audio, transcription, interviewer responses, and coding events. The core client events include `start_interview`, `audio:stream`, `start_coding`, `sandbox_execute`, `coding_draft`, and `submit_coding`. Server events include `stt:transcript`, `ai_transcript`, `coding:started`, `sandbox_result`, and `interview:error`.
+Socket.IO handling is split by responsibility: `src/socket/interview.handler.ts` coordinates the interview lifecycle, audio, transcription, and interviewer responses, while `src/socket/interviewCoding.handler.ts` registers coding events using the shared session state. The core client events include `start_interview`, `audio:stream`, `start_coding`, `sandbox_execute`, `coding_draft`, and `submit_coding`. Server events include `stt:transcript`, `ai_transcript`, `coding:started`, `sandbox_result`, and `interview:error`.
 
 Coding assignments are selected from a curated bank. Supported languages are JavaScript, Python, and C++; assignment availability and timing are controlled by the backend. A sandbox run is not a final solution verification: the final submission is checked against private tests.
 
@@ -109,6 +109,8 @@ src/
   schemas/       Request and socket validation
   services/      Interview, coding, sandbox, and report logic
   socket/        Live interview and coding event handlers
+    interview.handler.ts        Session lifecycle, audio, and interviewer flow
+    interviewCoding.handler.ts  Coding socket event registration
   test/          Vitest tests
   workers/       Background report processing
 ```
