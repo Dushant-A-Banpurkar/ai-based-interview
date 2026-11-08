@@ -39,6 +39,8 @@ backend/
     routes/           Express routes
     services/         Interview, assignment, submission, and report services
     socket/           Socket.IO handlers
+      interview.handler.ts        Session lifecycle, audio, and interviewer flow
+      interviewCoding.handler.ts  Coding socket events
     workers/          Background processing
     test/             Backend tests
 frontend/
