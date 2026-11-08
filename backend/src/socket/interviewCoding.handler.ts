@@ -148,7 +148,10 @@ export function registerCodingHandlers(context: CodingHandlerContext): void {
 
       scheduleCodingTimeout(remainingSeconds);
     } catch (error) {
-      console.error(`Failed to start coding for interview ${interviewId}:`, error);
+      console.error(
+        `Failed to start coding for interview ${interviewId}:`,
+        error,
+      );
       io.to(interviewId).emit("interview:error", {
         message: "Could not start the coding assignment.",
       });
@@ -214,11 +217,13 @@ export function registerCodingHandlers(context: CodingHandlerContext): void {
 
   socket.on(
     "sandbox_execute",
-    async (payload: {
-      interviewId?: string;
-      language?: string;
-      code?: string;
-    } | null) => {
+    async (
+      payload: {
+        interviewId?: string;
+        language?: string;
+        code?: string;
+      } | null,
+    ) => {
       if (!payload) {
         socket.emit("interview:error", {
           message: "Invalid code execution request.",
