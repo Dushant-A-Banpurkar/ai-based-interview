@@ -18,7 +18,9 @@ import {
   setCodingStartRequested,
   setTargetSession,
 } from "@/src/store/slices/interviewSlice";
-import React, { use, useEffect, useState } from "react";
+import { useEndInterview } from "@/src/hooks/useEndInterview";
+import { useRouter } from "next/navigation";
+import React, { use, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 interface PageProps {
@@ -29,6 +31,9 @@ export default function LiveInterviewPage({ params }: PageProps) {
   const { id: interviewId } = use(params);
 
   const { data: interviewData } = useInterviewStatus(interviewId);
+  const endInterview = useEndInterview();
+  const endInterviewMutation = endInterview.mutate;
+  const router = useRouter();
   const dispatch = useDispatch();
   const phase = useSelector(selectInterviewPhase);
   const transcript = useSelector(selectTranscript);
@@ -41,6 +46,7 @@ export default function LiveInterviewPage({ params }: PageProps) {
     selectCodingUnavailableMessage,
   );
   const [now, setNow] = useState<number | null>(null);
+  const endAttempted = useRef(false);
 
   useEffect(() => {
     const initialTimerId = setTimeout(() => setNow(Date.now()), 0);
@@ -61,7 +67,6 @@ export default function LiveInterviewPage({ params }: PageProps) {
     };
   }, [dispatch, interviewId]);
 
-  const { isListening, error: micError } = useMeydaTelemetry({ enabled: true });
   const startedAt = interviewData?.interviewStartedAt
     ? Date.parse(interviewData.interviewStartedAt)
     : null;
@@ -76,6 +81,36 @@ export default function LiveInterviewPage({ params }: PageProps) {
             Math.floor((now - startedAt) / 1000),
         )
       : null;
+  const interviewEnded =
+    interviewData?.status === "processing" ||
+    interviewData?.status === "completed";
+
+  const { isListening, error: micError } = useMeydaTelemetry({
+    enabled: remainingSeconds !== 0 && !interviewEnded,
+  });
+
+  useEffect(() => {
+    if (
+      remainingSeconds === 0 &&
+      interviewData?.status === "live" &&
+      !endAttempted.current
+    ) {
+      endAttempted.current = true;
+      endInterviewMutation(interviewId);
+    }
+  }, [
+    endInterviewMutation,
+    interviewData?.status,
+    interviewId,
+    remainingSeconds,
+  ]);
+
+  useEffect(() => {
+    if (interviewEnded || endInterview.isSuccess) {
+      router.replace(`/interview/${interviewId}/report`);
+    }
+  }, [endInterview.isSuccess, interviewEnded, interviewId, router]);
+
   const formattedRemainingTime =
     remainingSeconds === null
       ? "Waiting to start"
@@ -123,6 +158,31 @@ export default function LiveInterviewPage({ params }: PageProps) {
         {micError && (
           <div className="mb-4 rounded-xl bg-red-950/30 border border-red-500/30 p-4 text-sm text-red-400 shadow-lg leading-relaxed">
             {micError}
+          </div>
+        )}
+        {endInterview.isError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-300"
+          >
+            <p>
+              {endInterview.error.message ||
+                "Could not end the interview automatically."}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                endAttempted.current = true;
+                endInterviewMutation(interviewId, {
+                  onSuccess: () => {
+                    router.replace(`/interview/${interviewId}/report`);
+                  },
+                });
+              }}
+              className="mt-2 font-semibold underline underline-offset-2"
+            >
+              Retry ending interview
+            </button>
           </div>
         )}
 
