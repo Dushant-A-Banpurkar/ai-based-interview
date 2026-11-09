@@ -8,6 +8,8 @@ const fetchInterviewReport = async (interviewId: string) => {
 
   const res = await fetchInterviewBackend(`/api/interviews/${interviewId}/report`);
 
+  if (res.status === 404) return null;
+
   if (!res.ok) {
     const errData = await res.json();
     throw new Error(
@@ -15,7 +17,8 @@ const fetchInterviewReport = async (interviewId: string) => {
     );
   }
 
-  return res.json();
+  const data = await res.json();
+  return data.report ?? null;
 };
 
 export const useInterviewReport = (interviewId: string) => {
@@ -23,6 +26,7 @@ export const useInterviewReport = (interviewId: string) => {
     queryKey: ["interviewReport", interviewId],
     queryFn: () => fetchInterviewReport(interviewId),
     enabled: !!interviewId,
-    retry: 2,
+    refetchInterval: (query) => (query.state.data ? false : 3000),
+    retry: false,
   });
 };
