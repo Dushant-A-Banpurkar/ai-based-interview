@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,9 +27,6 @@ export const useEndInterview = () => {
 
   return useMutation({
     mutationFn: endInterviewSession,
-    onError: (error: any) => {
-      throw new Error(error.message || "Failed to end interview");
-    },
     onSuccess: (data, interviewId) => {
       toast.success("Interview complete. Evaluation report has been queued.");
       dispatch({ type: "interview/clearActiveSession" });
