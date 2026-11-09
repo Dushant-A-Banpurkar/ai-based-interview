@@ -2,6 +2,7 @@
 "use client";
 
 import { useInterviewReport } from "@/src/hooks/useInterviewReport";
+import { useInterviewStatus } from "@/src/hooks/useInterviewStatus";
 import { useParams } from "next/navigation";
 
 export default function ReportDashboard() {
@@ -9,7 +10,18 @@ export default function ReportDashboard() {
   const interviewId = params.id as string;
 
   const { data: report, isLoading, isError } = useInterviewReport(interviewId);
-  if (isLoading) {
+  const {
+    data: interviewStatus,
+    isLoading: isStatusLoading,
+    isError: isStatusError,
+  } = useInterviewStatus(interviewId);
+
+  if (
+    isLoading ||
+    (!report &&
+      !isStatusError &&
+      (isStatusLoading || interviewStatus?.status === "processing"))
+  ) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
         <div className="flex flex-col items-center gap-4">
@@ -20,7 +32,7 @@ export default function ReportDashboard() {
     );
   }
 
-  if (isError || !report) {
+  if (isError || isStatusError || !report) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950 text-red-400">
         <p>
