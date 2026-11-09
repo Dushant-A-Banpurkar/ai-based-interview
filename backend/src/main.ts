@@ -107,14 +107,18 @@ async function startServer() {
       console.log(`AI Interview Backend running on port ${PORT}`);
     });
     const renderUrl = process.env.RENDER!;
-    const backupUrl=process.env.RENDER_BACKUP!;
+    const backupUrl = process.env.RENDER_BACKUP!;
     setInterval(
       async () => {
         try {
           const response = await fetch(renderUrl!);
-          const response2=await fetch(backupUrl!);
-          console.log(`Keep-alive ping successful of Main Server: ${response.status}`);
-          console.log(`Keep-alive ping successful of BackUp Server: ${response2.status}`)
+          const response2 = await fetch(backupUrl!);
+          console.log(
+            `Keep-alive ping successful of Main Server: ${response.status}`,
+          );
+          console.log(
+            `Keep-alive ping successful of BackUp Server: ${response2.status}`,
+          );
         } catch (error: any) {
           console.error(`Keep-alive ping failed:`, error.message);
         }
