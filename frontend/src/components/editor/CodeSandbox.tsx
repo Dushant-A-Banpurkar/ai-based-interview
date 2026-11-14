@@ -119,6 +119,16 @@ export default function CodeSandbox() {
     return () => clearTimeout(timeoutId);
   }, [code, codingStatus, dispatch, interviewId, language]);
 
+  useEffect(() => {
+    if (codingStatus !== "active" || !interviewId) return;
+    if (submissionState === "pending") {
+      dispatch(updateSandboxOutput({
+        stdout: "Final code submitted. Waiting for verification…",
+        stderr: null,
+      }));
+    }
+  }, [codingStatus, dispatch, interviewId, submissionState]);
+
   const handleCodeChange = (nextCode: string | undefined) => {
     const updatedCode = nextCode ?? "";
     dispatch(setCodingDraft({ code: updatedCode, language }));
@@ -128,7 +138,12 @@ export default function CodeSandbox() {
     event: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const nextLanguage = event.target.value;
-    dispatch(setCodingDraft({ code, language: nextLanguage }));
+    const currentTemplate = LANGUAGE_TEMPLATES[language] ?? "";
+    const nextTemplate = LANGUAGE_TEMPLATES[nextLanguage] ?? "";
+    const nextCode =
+      code === "" || code === currentTemplate ? nextTemplate : code;
+
+    dispatch(setCodingDraft({ code: nextCode, language: nextLanguage }));
   };
 
   const runCode = () => {
@@ -149,7 +164,15 @@ export default function CodeSandbox() {
   };
 
   const submitCode = () => {
-    if (!interviewId || codingStatus !== "active" || isSubmitting) return;
+    if (
+      !interviewId ||
+      codingStatus !== "active" ||
+      isSubmitting ||
+      !code.trim()
+    ) {
+      return;
+    }
+
     dispatch(setCodingSubmissionState("pending"));
     dispatch({
       type: "socket/emit",
@@ -194,25 +217,32 @@ export default function CodeSandbox() {
             {assignment.functionSignature}
           </p>
         )}
-        {assignment?.examples.map((example, index) => (
-          <div
-            key={`${assignment.problemId}-example-${index}`}
-            className="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-xs"
-          >
-            <p className="mb-1 font-semibold text-slate-300">
-              Example {index + 1}
+        {!!assignment?.examples.length && (
+          <div className="mt-4">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Sample test cases
             </p>
-            <p className="font-mono text-slate-400">
-              Input: {example.input}
-            </p>
-            <p className="font-mono text-slate-400">
-              Output: {example.output}
-            </p>
-            {example.explanation && (
-              <p className="mt-1 text-slate-500">{example.explanation}</p>
-            )}
+            {assignment.examples.map((example, index) => (
+              <div
+                key={`${assignment.problemId}-example-${index}`}
+                className="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-xs"
+              >
+                <p className="mb-1 font-semibold text-slate-300">
+                  Test case {index + 1}
+                </p>
+                <p className="font-mono text-slate-400">
+                  Input: {example.input}
+                </p>
+                <p className="font-mono text-slate-400">
+                  Output: {example.output}
+                </p>
+                {example.explanation && (
+                  <p className="mt-1 text-slate-500">{example.explanation}</p>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
+        )}
         {!!assignment?.constraints.length && (
           <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-400">
             {assignment.constraints.map((constraint) => (
@@ -254,14 +284,14 @@ export default function CodeSandbox() {
           <button
             type="button"
             onClick={submitCode}
-            disabled={isSubmitting || codingStatus !== "active"}
+            disabled={isSubmitting || codingStatus !== "active" || !code.trim()}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting
               ? "Submitting…"
               : submissionState === "failed"
-                ? "Retry Submit"
-                : "Submit"}
+                ? "Retry Final Submit"
+                : "Submit Final Code"}
           </button>
         </div>
       </div>
