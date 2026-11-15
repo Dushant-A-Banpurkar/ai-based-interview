@@ -1,197 +1,326 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useSignIn } from "@/src/hooks/useLogin";
 import { useSignUp } from "@/src/hooks/useSignup";
-import { Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  AudioLines,
+  Bot,
+  Braces,
+  Check,
+  FileText,
+  Sparkles,
+} from "lucide-react";
+
+const fieldClassName =
+  "mt-2 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/10";
 
 export default function Home() {
   const [isSignUp, setIsSignUp] = useState(false);
-
-  const [loginMutation, loginData, loginErrors, handleLoginChange, handleLoginSubmit] = useSignIn();
-
- 
-  const [signupData, signupErrors, handleSignupChange, handleSignupSubmit, signupMutation] = useSignUp();
+  const [
+    loginMutation,
+    loginData,
+    loginErrors,
+    handleLoginChange,
+    handleLoginSubmit,
+  ] = useSignIn();
+  const [
+    signupData,
+    signupErrors,
+    handleSignupChange,
+    handleSignupSubmit,
+    signupMutation,
+  ] = useSignUp();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-white selection:bg-blue-500/30">
-      <div className="grid w-full max-w-4xl grid-cols-1 overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/40 shadow-2xl backdrop-blur-md md:grid-cols-2">
-        
-        <div className="relative flex flex-col justify-between border-b border-slate-800/80 p-8 md:border-b-0 md:border-r md:border-slate-800/80 bg-slate-900/60">
-          <div className="absolute right-0 top-0 p-6 opacity-5 pointer-events-none">
-            <Sparkles className="size-40 text-blue-500" />
-          </div>
-
-          <div>
-            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-400">
-              AI Interview Platform
+    <main className="relative min-h-screen overflow-hidden bg-[#080d18] text-white selection:bg-cyan-300/30">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_18%_22%,rgba(8,145,178,0.16),transparent_38%),radial-gradient(ellipse_at_84%_76%,rgba(79,70,229,0.16),transparent_35%)]"
+      />
+      <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 py-6 sm:px-8 lg:px-12">
+        <header className="flex items-center justify-between">
+          <Link href="/" className="inline-flex items-center gap-3" aria-label="Interview Lab home">
+            <span className="flex size-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200">
+              <Bot className="size-5" />
             </span>
+            <span className="text-sm font-semibold tracking-wide text-slate-100">
+              Interview Lab
+            </span>
+          </Link>
+          <span className="hidden text-sm text-slate-400 sm:inline">
+            {isSignUp ? "Already have an account?" : "New to Interview Lab?"}{" "}
+            <button
+              type="button"
+              onClick={() => setIsSignUp((current) => !current)}
+              className="font-medium text-cyan-200 transition hover:text-white"
+            >
+              {isSignUp ? "Sign in" : "Create an account"}
+            </button>
+          </span>
+        </header>
 
-            <h1 className="mt-4 bg-linear-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-3xl font-bold leading-tight tracking-tight text-transparent">
-              Master Your Next Technical Assessment
+        <div className="grid flex-1 items-center gap-12 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20 lg:py-16">
+          <section className="mx-auto w-full max-w-xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-200/15 bg-cyan-200/[0.06] px-3.5 py-2 text-xs font-medium text-cyan-100">
+              <Sparkles className="size-3.5" />
+              A focused space to practice technical interviews
+            </div>
+            <h1 className="max-w-xl text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-6xl">
+              Get comfortable
+              <span className="block bg-gradient-to-r from-cyan-200 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
+                thinking out loud.
+              </span>
             </h1>
-
-            <p className="mt-3 text-sm leading-relaxed text-slate-400">
-              Real-time acoustic telemetry, secure code sandboxing, and automated AI evaluation reports designed for software engineers.
+            <p className="mt-6 max-w-lg text-base leading-7 text-slate-400 sm:text-lg">
+              Run a technical mock interview, talk through your approach, and
+              review an AI-generated report when you finish.
             </p>
-          </div>
 
-          <div className="mt-8 flex items-center gap-3 text-xs text-slate-500 font-mono">
-            <ShieldCheck className="size-4 text-emerald-400" />
-            <span>Connected to Render Cloud Backend</span>
-          </div>
-        </div>
-       
-        <div className="flex flex-col justify-center p-8 bg-slate-950/40">
-          <div className="flex rounded-xl border border-slate-800/80 bg-slate-900/50 p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(false)}
-              className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all duration-200 ${
-                !isSignUp ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSignUp(true)}
-              className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all duration-200 ${
-                isSignUp ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
-
-          {!isSignUp ? (
-           
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {loginErrors.general && (
-                <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-400">
-                  {loginErrors.general}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Email Address</label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  value={loginData.email}
-                  onChange={handleLoginChange}
-                  placeholder="engineer@example.com"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none transition duration-150"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  required
-                  value={loginData.password}
-                  onChange={handleLoginChange}
-                  placeholder="••••••••"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none transition duration-150"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginMutation.isPending}
-                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-linear-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 cursor-pointer"
-              >
-                {loginMutation.isPending ? "Authenticating..." : "Access Dashboard"}
-                <ArrowRight className="size-4" />
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSignupSubmit} className="space-y-3">
-              {signupErrors.general && (
-                <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-400">
-                  {signupErrors.general}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
+            <div className="mt-10 space-y-4">
+              <div className="flex items-start gap-4">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-800/80 text-cyan-200">
+                  <AudioLines className="size-4" />
+                </span>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-400 mb-1">First Name</label>
-                  <input
-                    type="text"
-                    name="firstname"
-                    required
-                    value={signupData.firstname}
-                    onChange={handleSignupChange}
-                    placeholder="Dushant"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none"
-                  />
+                  <h2 className="text-sm font-medium text-slate-100">
+                    Live, voice-led practice
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    Respond to interview prompts in a real-time session.
+                  </p>
                 </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-800/80 text-cyan-200">
+                  <Braces className="size-4" />
+                </span>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-400 mb-1">Last Name</label>
-                  <input
-                    type="text"
-                    name="lastname"
-                    required
-                    value={signupData.lastname}
-                    onChange={handleSignupChange}
-                    placeholder="Banpurkar"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none"
-                  />
+                  <h2 className="text-sm font-medium text-slate-100">
+                    Optional coding sandbox
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    Work through a coding exercise when the session includes one.
+                  </p>
                 </div>
               </div>
+              <div className="flex items-start gap-4">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-800/80 text-cyan-200">
+                  <FileText className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-medium text-slate-100">
+                    A report after your session
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    Review feedback and question-by-question takeaways.
+                  </p>
+                </div>
+              </div>
+            </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1">Username</label>
-                <input
-                  type="text"
-                  name="username"
-                  required
-                  value={signupData.username}
-                  onChange={handleSignupChange}
-                  placeholder="dushant_banpurkar"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none"
-                />
+            <div className="mt-10 flex items-center gap-2 border-t border-slate-800/80 pt-5 text-xs text-slate-500">
+              <Check className="size-3.5 text-emerald-300" />
+              Set up a role, difficulty, and session length before you begin.
+            </div>
+          </section>
+
+          <section className="mx-auto w-full max-w-md">
+            <div className="rounded-3xl border border-white/10 bg-slate-900/75 p-6 shadow-[0_30px_100px_-40px_rgba(8,145,178,0.3)] backdrop-blur-xl sm:p-8">
+              <div className="mb-7">
+                <div className="mb-5 flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-300/20 to-indigo-400/20 text-cyan-100">
+                  <Bot className="size-5" />
+                </div>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200/80">
+                  {isSignUp ? "Get started" : "Welcome back"}
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                  {isSignUp ? "Create your account" : "Sign in to continue"}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  {isSignUp
+                    ? "Create an account to start your interview practice."
+                    : "Pick up where you left off and prepare for your next interview."}
+                </p>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  value={signupData.email}
-                  onChange={handleSignupChange}
-                  placeholder="engineer@example.com"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  required
-                  value={signupData.password}
-                  onChange={handleSignupChange}
-                  placeholder="••••••••"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={signupMutation.isPending}
-                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-linear-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 transition duration-300 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 cursor-pointer"
+              <div
+                className="mb-6 grid grid-cols-2 rounded-xl border border-slate-800 bg-slate-950/70 p-1"
               >
-                {signupMutation.isPending ? "Creating Account..." : "Get Started"}
-                <ArrowRight className="size-4" />
-              </button>
-            </form>
-          )}
+                <button
+                  type="button"
+                  aria-pressed={!isSignUp}
+                  onClick={() => setIsSignUp(false)}
+                  className={`rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                    !isSignUp
+                      ? "bg-slate-800 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={isSignUp}
+                  onClick={() => setIsSignUp(true)}
+                  className={`rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                    isSignUp
+                      ? "bg-slate-800 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Sign up
+                </button>
+              </div>
+
+              {!isSignUp ? (
+                <form onSubmit={handleLoginSubmit} className="space-y-5">
+                  {loginErrors.general && (
+                    <p
+                      role="alert"
+                      className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200"
+                    >
+                      {loginErrors.general}
+                    </p>
+                  )}
+                  <label className="block text-sm font-medium text-slate-300">
+                    Email address
+                    <input
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      required
+                      value={loginData.email}
+                      onChange={handleLoginChange}
+                      placeholder="you@example.com"
+                      className={fieldClassName}
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-300">
+                    Password
+                    <input
+                      type="password"
+                      name="password"
+                      autoComplete="current-password"
+                      required
+                      value={loginData.password}
+                      onChange={handleLoginChange}
+                      placeholder="Enter your password"
+                      className={fieldClassName}
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={loginMutation.isPending}
+                    className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loginMutation.isPending ? "Signing in…" : "Sign in"}
+                    {!loginMutation.isPending && (
+                      <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleSignupSubmit} className="space-y-4">
+                  {signupErrors.general && (
+                    <p
+                      role="alert"
+                      className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200"
+                    >
+                      {signupErrors.general}
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block text-sm font-medium text-slate-300">
+                      First name
+                      <input
+                        type="text"
+                        name="firstname"
+                        autoComplete="given-name"
+                        required
+                        value={signupData.firstname}
+                        onChange={handleSignupChange}
+                        placeholder="First name"
+                        className={fieldClassName}
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-300">
+                      Last name
+                      <input
+                        type="text"
+                        name="lastname"
+                        autoComplete="family-name"
+                        required
+                        value={signupData.lastname}
+                        onChange={handleSignupChange}
+                        placeholder="Last name"
+                        className={fieldClassName}
+                      />
+                    </label>
+                  </div>
+                  <label className="block text-sm font-medium text-slate-300">
+                    Username
+                    <input
+                      type="text"
+                      name="username"
+                      autoComplete="username"
+                      required
+                      value={signupData.username}
+                      onChange={handleSignupChange}
+                      placeholder="Choose a username"
+                      className={fieldClassName}
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-300">
+                    Email address
+                    <input
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      required
+                      value={signupData.email}
+                      onChange={handleSignupChange}
+                      placeholder="you@example.com"
+                      className={fieldClassName}
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-300">
+                    Password
+                    <input
+                      type="password"
+                      name="password"
+                      autoComplete="new-password"
+                      required
+                      value={signupData.password}
+                      onChange={handleSignupChange}
+                      placeholder="Create a password"
+                      className={fieldClassName}
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={signupMutation.isPending}
+                    className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {signupMutation.isPending
+                      ? "Creating account…"
+                      : "Create account"}
+                    {!signupMutation.isPending && (
+                      <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+                    )}
+                  </button>
+                </form>
+              )}
+              <p className="mt-6 text-center text-xs leading-5 text-slate-500">
+                Your interview sessions and reports appear in your dashboard.
+              </p>
+            </div>
+            <p className="mt-5 text-center text-xs text-slate-600">
+              Choose your practice setup when you start a session.
+            </p>
+          </section>
         </div>
       </div>
     </main>
