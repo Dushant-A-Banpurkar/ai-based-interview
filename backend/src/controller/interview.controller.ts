@@ -201,6 +201,43 @@ export async function getInterviewStatus(
   }
 }
 
+export async function getInterviewHistory(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const candidateId =
+    typeof req.query.candidateId === "string" ? req.query.candidateId.trim() : "";
+
+  if (!candidateId) {
+    res.status(400).json({ error: "A candidateId is required." });
+    return;
+  }
+
+  try {
+    const interviews = await InterviewModel.find(
+      { candidateId },
+      "roleTitle difficultyMode durationMinutes status createdAt",
+    )
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    res.status(200).json({
+      interviews: interviews.map((interview) => ({
+        id: interview._id.toString(),
+        roleTitle: interview.roleTitle,
+        difficultyMode: interview.difficultyMode,
+        durationMinutes: interview.durationMinutes,
+        status: interview.status,
+        createdAt: interview.createdAt,
+      })),
+    });
+  } catch (error: any) {
+    console.error("Error in getInterviewHistory:", error.message);
+    res.status(500).json({ error: "Failed to fetch interview history." });
+  }
+}
+
 export async function getInterviewReport(
   req: Request,
   res: Response,
