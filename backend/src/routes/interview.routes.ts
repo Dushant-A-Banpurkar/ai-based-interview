@@ -1,5 +1,5 @@
 import {Router} from 'express';
-import { createInterviewSession, endInterviewSession, getInterviewReport, getInterviewStatus } from '../controller/interview.controller';
+import { createInterviewSession, endInterviewSession, getInterviewHistory, getInterviewReport, getInterviewStatus } from '../controller/interview.controller';
 import { uploadMemory } from '../middlewares/uploadMemory';
 
 const router=Router();
@@ -8,6 +8,8 @@ router.post('/createinterviewsession', uploadMemory.single("pdf"), createIntervi
 
 
 router.post('/:interviewId/end',endInterviewSession);
+
+router.get('/history', getInterviewHistory);
 
 router.get('/:interviewId/status', getInterviewStatus);
 
