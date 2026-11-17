@@ -111,5 +111,5 @@ const CandidateReportSchema = new Schema(
 );
 
 export const CandidateReportModel: Model<ICandidateReport> =
-  mongoose.models.CandiateReport ||
+  (mongoose.models.CandidateReport as Model<ICandidateReport>) ||
   mongoose.model<ICandidateReport>("CandidateReport", CandidateReportSchema);
