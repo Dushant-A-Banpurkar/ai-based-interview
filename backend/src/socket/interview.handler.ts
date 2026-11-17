@@ -66,6 +66,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
   let pendingTranscriptSegments: string[] = [];
   let pendingSpeechDuringCoding = false;
   let lastInterviewerQuestion = "";
+  let lastCandidateSpeechObservedAt = 0;
   let interviewPromptContext: InterviewPromptContext | null = null;
   let codingAssignment: StoredCodingAssignment | null = null;
   let allowedLanguages: string[] = [];
@@ -257,8 +258,25 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
     clearQuestionRepeatTimer();
     if (!lastInterviewerQuestion) return;
 
+    const now = Date.now();
+    if (
+      pendingTranscriptSegments.length > 0 ||
+      (lastCandidateSpeechObservedAt > 0 && now - lastCandidateSpeechObservedAt < 15000)
+    ) {
+      return;
+    }
+
     questionRepeatTimer = setTimeout(() => {
       questionRepeatTimer = null;
+
+      const nowAfterDelay = Date.now();
+      if (
+        pendingTranscriptSegments.length > 0 ||
+        (lastCandidateSpeechObservedAt > 0 &&
+          nowAfterDelay - lastCandidateSpeechObservedAt < 15000)
+      ) {
+        return;
+      }
 
       const repeatedQuestion = `I haven't heard a response yet. Let me repeat the question: ${lastInterviewerQuestion}`;
       io.to(interviewId).emit("ai_transcript", {
@@ -291,6 +309,8 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
     const queuedPhaseVersion = phaseVersion;
     interviewerQueue = interviewerQueue
       .then(async () => {
+        clearQuestionRepeatTimer();
+        lastCandidateSpeechObservedAt = Date.now();
         await redis.rpush(
           `interview:${interviewId}:transcript`,
           JSON.stringify({
@@ -758,12 +778,14 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
 
       if (data?.type === "SpeechStarted") {
         clearQuestionRepeatTimer();
+        lastCandidateSpeechObservedAt = Date.now();
         return;
       }
 
       const transcript = data?.channel?.alternatives?.[0]?.transcript?.trim();
       if (transcript && data.is_final) {
         clearQuestionRepeatTimer();
+        lastCandidateSpeechObservedAt = Date.now();
         if (codingActive) pendingSpeechDuringCoding = true;
         pendingTranscriptSegments.push(transcript);
         const answerInProgress = pendingTranscriptSegments.join(" ");
@@ -775,6 +797,7 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
         if (answerSilenceTimer) clearTimeout(answerSilenceTimer);
         answerSilenceTimer = setTimeout(() => {
           answerSilenceTimer = null;
+          lastCandidateSpeechObservedAt = Date.now();
           const answer = pendingTranscriptSegments.join(" ").trim();
           pendingTranscriptSegments = [];
           const generateResponse =
