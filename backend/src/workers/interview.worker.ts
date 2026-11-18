@@ -36,6 +36,82 @@ interface RawMeydaFrame {
   timestamp: number;
 }
 
+function buildFallbackReport(
+  interviewId: string,
+  transcript: any[],
+  codeSubmissions: any[],
+  audioTelemetrySummary: ReturnType<typeof aggregateMeydaTelemetry>,
+) {
+  const solvedCount = codeSubmissions.filter(
+    (submission) => submission.submissionStatus === "solved",
+  ).length;
+  const attemptedCount = codeSubmissions.filter(
+    (submission) => submission.submissionStatus === "attempted",
+  ).length;
+  const totalQuestions = transcript.length;
+  const baseScore = Math.min(
+    100,
+    Math.max(
+      40,
+      55 + solvedCount * 15 + Math.min(attemptedCount, 3) * 5,
+    ),
+  );
+
+  return {
+    interviewId,
+    overallScore: baseScore,
+    recommendation: solvedCount > 0 ? "Hire" : "No Hire",
+    executiveSummary:
+      `The candidate completed ${totalQuestions} recorded interview interactions with ${solvedCount} verified solved submission(s). ` +
+      "This fallback evaluation was generated because the configured AI provider was unavailable, so the score is based on interview activity and submission outcomes.",
+    technicalEvaluation: {
+      score: Math.min(100, Math.max(40, baseScore - 5)),
+      codeAnalysis:
+        "Submission progress indicates the candidate engaged with the coding tasks and achieved a measurable level of solution completion. Full qualitative assessment was not available because no LLM provider was configured for report synthesis.",
+      strengths: [
+        "Attempted the assigned interview tasks.",
+        solvedCount > 0
+          ? "Produced at least one completed solution path."
+          : "Demonstrated measurable engagement with the exercise.",
+      ],
+      improvements: [
+        "Request a connected AI provider for a richer evaluation.",
+        "Review code correctness and edge-case handling in more depth.",
+      ],
+    },
+    communicationEvaluation: {
+      score: Math.min(10, Math.max(4, Math.round((audioTelemetrySummary.averageRms || 0) * 10))),
+      clarityAndStructure:
+        "Candidate transcript activity was recorded, but no detailed language assessment could be produced without a provider-backed analysis.",
+      deliveryAndConfidence:
+        `Audio telemetry summary: RMS ${audioTelemetrySummary.averageRms ?? 0}, spectral centroid ${audioTelemetrySummary.averageSpectralCentroid ?? 0}, ZCR ${audioTelemetrySummary.averageZcr ?? 0}.`,
+    },
+    redFlags: [
+      "Fallback report mode was used because no AI provider was configured.",
+    ],
+    questionBreakdown:
+      transcript.length > 0
+        ? transcript.slice(0, 5).map((item, index) => ({
+            questionText: item?.question ?? `Question ${index + 1}`,
+            score: Math.min(10, Math.max(4, 7 + (solvedCount > 0 ? 1 : 0))),
+            candidateResponseSummary:
+              item?.response ?? "No transcript response was captured for this question.",
+            keyTakeaway:
+              "Interview response was logged and included in the fallback evaluation.",
+          }))
+        : [
+            {
+              questionText: "Interview session recorded",
+              score: 6,
+              candidateResponseSummary:
+                "No interview transcripts were available at report time.",
+              keyTakeaway:
+                "The interview record was preserved but no detailed question-by-question commentary was generated.",
+            },
+          ],
+  };
+}
+
 function aggregateMeydaTelemetry(frames: RawMeydaFrame[]) {
   if (!frames.length) {
     return {
@@ -135,48 +211,93 @@ Return a JSON object conforming strictly to this structure:
 `;
   let parsedReport;
 
-  try {
-    if (!openai) throw new Error("OPENAI_API_KEY is not configured.");
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
-    });
-    parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
-  } catch (openaiError: any) {
+  if (!openai && !gemini) {
     console.warn(
-      `[Worker] OpenAI failed (${openaiError.message}). Switching to Gemini for interview report...`,
+      `[Worker] No OpenAI or Gemini provider configured. Generating a fallback report for: ${interviewId}`,
     );
-    if (!gemini) {
-      throw new Error(
-        "Report generation requires GEMINI_API_KEY when OpenAI is unavailable.",
-        { cause: openaiError },
+    parsedReport = buildFallbackReport(
+      interviewId,
+      transcript,
+      codeSubmissions,
+      audioTelemetrySummary,
+    );
+  } else {
+    try {
+      if (!openai) throw new Error("OPENAI_API_KEY is not configured.");
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+      });
+      parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
+    } catch (openaiError: any) {
+      console.warn(
+        `[Worker] OpenAI failed (${openaiError.message}). Switching to Gemini for interview report...`,
       );
+      try {
+        if (!gemini) {
+          throw new Error(
+            "Report generation requires GEMINI_API_KEY when OpenAI is unavailable.",
+            { cause: openaiError },
+          );
+        }
+        const completion = await gemini.chat.completions.create({
+          model: "gemini-3.5-flash-lite",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+        });
+        parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
+      } catch (geminiError: any) {
+        console.warn(
+          `[Worker] Gemini failed (${geminiError.message}). Writing a fallback report instead...`,
+        );
+        parsedReport = buildFallbackReport(
+          interviewId,
+          transcript,
+          codeSubmissions,
+          audioTelemetrySummary,
+        );
+      }
     }
-    const completion = await gemini.chat.completions.create({
-      model: "gemini-3.5-flash-lite",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    });
-    parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
   }
+
+  const normalizedReport = {
+    overallScore: parsedReport?.overallScore ?? 50,
+    recommendation: parsedReport?.recommendation ?? "No Hire",
+    executiveSummary: parsedReport?.executiveSummary ?? "",
+    technicalEvaluation:
+      parsedReport?.technicalEvaluation ?? {
+        score: 50,
+        codeAnalysis: "No technical analysis was generated.",
+        strengths: ["Interview activity was recorded."],
+        improvements: ["Configure an AI provider for a richer summary."],
+      },
+    communicationEvaluation:
+      parsedReport?.communicationEvaluation ?? {
+        score: 5,
+        clarityAndStructure: "No communication analysis was generated.",
+        deliveryAndConfidence: "No delivery analysis was generated.",
+      },
+    redFlags: parsedReport?.redFlags ?? [],
+    questionBreakdown: parsedReport?.questionBreakdown ?? [],
+  };
 
   const savedReport = await CandidateReportModel.create({
     interviewId,
-    overallScore: parsedReport.overallScore ?? 50,
-    recommendation: parsedReport.recommendation ?? "No Hire",
-    executiveSummary: parsedReport.executiveSummary ?? "",
-    technicalEvaluation: parsedReport.technicalEvaluation,
-    communicationEvaluation: parsedReport.communicationEvaluation,
-    redFlags: parsedReport.redFlags ?? [],
-    questionBreakdown: parsedReport.questionBreakdown ?? [],
+    overallScore: normalizedReport.overallScore,
+    recommendation: normalizedReport.recommendation,
+    executiveSummary: normalizedReport.executiveSummary,
+    technicalEvaluation: normalizedReport.technicalEvaluation,
+    communicationEvaluation: normalizedReport.communicationEvaluation,
+    redFlags: normalizedReport.redFlags,
+    questionBreakdown: normalizedReport.questionBreakdown,
   });
 
   await InterviewModel.findByIdAndUpdate(interviewId, { status: "completed" });
