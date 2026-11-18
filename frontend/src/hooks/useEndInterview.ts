@@ -34,6 +34,9 @@ export const useEndInterview = () => {
       queryClient.invalidateQueries({
         queryKey: ["interviewStatus", interviewId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["interviewReport", interviewId],
+      });
     },
   });
 };
