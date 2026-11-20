@@ -119,14 +119,18 @@ async function startServer() {
         }
         console.log("Deepgram API key loaded from the backend environment.");
         await (0, mongodb_1.default)();
+        await import("./workers/interview.worker.js");
         httpServer.listen(PORT, () => {
             console.log(`AI Interview Backend running on port ${PORT}`);
         });
-        const renderUrl = process.env.render;
+        const renderUrl = process.env.RENDER;
+        const backupUrl = process.env.RENDER_BACKUP;
         setInterval(async () => {
             try {
                 const response = await fetch(renderUrl);
-                console.log(`Keep-alive ping successful: ${response.status}`);
+                const response2 = await fetch(backupUrl);
+                console.log(`Keep-alive ping successful of Main Server: ${response.status}`);
+                console.log(`Keep-alive ping successful of BackUp Server: ${response2.status}`);
             }
             catch (error) {
                 console.error(`Keep-alive ping failed:`, error.message);

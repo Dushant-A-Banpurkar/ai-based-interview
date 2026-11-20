@@ -6,6 +6,7 @@ const uploadMemory_1 = require("../middlewares/uploadMemory");
 const router = (0, express_1.Router)();
 router.post('/createinterviewsession', uploadMemory_1.uploadMemory.single("pdf"), interview_controller_1.createInterviewSession);
 router.post('/:interviewId/end', interview_controller_1.endInterviewSession);
+router.get('/history', interview_controller_1.getInterviewHistory);
 router.get('/:interviewId/status', interview_controller_1.getInterviewStatus);
 router.get('/:interviewId/report', interview_controller_1.getInterviewReport);
 exports.default = router;

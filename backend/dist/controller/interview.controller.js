@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createInterviewSession = createInterviewSession;
 exports.endInterviewSession = endInterviewSession;
 exports.getInterviewStatus = getInterviewStatus;
+exports.getInterviewHistory = getInterviewHistory;
 exports.getInterviewReport = getInterviewReport;
 const pdfToText_1 = require("../helper/pdfToText");
 const interview_model_1 = require("../model/interview.model");
@@ -10,6 +11,8 @@ const interview_schema_1 = require("../schemas/interview.schema");
 const interview_queue_1 = require("../queues/interview.queue");
 const zod_1 = require("zod");
 const candidateReport_model_1 = require("../model/candidateReport.model");
+const codingSubmission_service_1 = require("../services/codingSubmission.service");
+const interview_handler_1 = require("../socket/interview.handler");
 async function createInterviewSession(req, res) {
     try {
         let parsedSkills = [];
@@ -103,6 +106,10 @@ async function endInterviewSession(req, res) {
             res.status(404).json({ error: "Interview session not found" });
             return;
         }
+        if (interview.codingStatus === "active") {
+            await (0, interview_handler_1.finalizeActiveCodingForInterview)(interviewId);
+            await (0, codingSubmission_service_1.finalizeCodingSubmission)(interviewId, "interview_ended");
+        }
         interview.status = "processing";
         await interview.save();
         await interview_queue_1.interviewReportQueue.add("generate-report", {
@@ -134,7 +141,7 @@ async function getInterviewStatus(req, res) {
             return;
         }
         const { interviewId } = validationResult.data;
-        const interview = await interview_model_1.InterviewModel.findById(interviewId, "status roleTitle createdAt");
+        const interview = await interview_model_1.InterviewModel.findById(interviewId, "status roleTitle createdAt durationMinutes interviewStartedAt");
         if (!interview) {
             res.status(404).json({ error: "Interview session not found." });
             return;
@@ -143,6 +150,9 @@ async function getInterviewStatus(req, res) {
             message: "Successfully fetch interview status",
             interviewId: interview._id,
             status: interview.status,
+            roleTitle: interview.roleTitle,
+            durationMinutes: interview.durationMinutes,
+            interviewStartedAt: interview.interviewStartedAt,
         });
     }
     catch (error) {
@@ -150,6 +160,33 @@ async function getInterviewStatus(req, res) {
         res
             .status(500)
             .json({ error: "Failed to fetch status", details: error.message });
+    }
+}
+async function getInterviewHistory(req, res) {
+    const candidateId = typeof req.query.candidateId === "string" ? req.query.candidateId.trim() : "";
+    if (!candidateId) {
+        res.status(400).json({ error: "A candidateId is required." });
+        return;
+    }
+    try {
+        const interviews = await interview_model_1.InterviewModel.find({ candidateId }, "roleTitle difficultyMode durationMinutes status createdAt")
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+        res.status(200).json({
+            interviews: interviews.map((interview) => ({
+                id: interview._id.toString(),
+                roleTitle: interview.roleTitle,
+                difficultyMode: interview.difficultyMode,
+                durationMinutes: interview.durationMinutes,
+                status: interview.status,
+                createdAt: interview.createdAt,
+            })),
+        });
+    }
+    catch (error) {
+        console.error("Error in getInterviewHistory:", error.message);
+        res.status(500).json({ error: "Failed to fetch interview history." });
     }
 }
 async function getInterviewReport(req, res) {

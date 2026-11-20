@@ -103,5 +103,5 @@ const CandidateReportSchema = new mongoose_1.Schema({
     timestamps: true,
     versionKey: false,
 });
-exports.CandidateReportModel = mongoose_1.default.models.CandiateReport ||
+exports.CandidateReportModel = mongoose_1.default.models.CandidateReport ||
     mongoose_1.default.model("CandidateReport", CandidateReportSchema);

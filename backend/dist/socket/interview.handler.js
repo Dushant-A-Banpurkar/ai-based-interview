@@ -37,21 +37,23 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerInterviewHandlers = void 0;
+exports.finalizeActiveCodingForInterview = finalizeActiveCodingForInterview;
 const sdk_1 = require("@deepgram/sdk");
 const interviewSocket_schema_1 = require("../schemas/interviewSocket.schema");
 const dotenv = __importStar(require("dotenv"));
 const ioredis_1 = __importDefault(require("ioredis"));
-const axios_1 = __importDefault(require("axios"));
 const interviewAssistant_service_1 = require("../services/interviewAssistant.service");
 const interview_model_1 = require("../model/interview.model");
+const codingAssignment_service_1 = require("../services/codingAssignment.service");
+const codingSubmission_service_1 = require("../services/codingSubmission.service");
+const interviewCoding_handler_1 = require("./interviewCoding.handler");
 dotenv.config();
 const redis = new ioredis_1.default(process.env.REDIS_URL);
-const JUDGE0_API_URL = process.env.JUDGE0_URL || "http://localhost:2358";
-const JUDGE0_LANGUAGE_MAP = {
-    javascript: 63,
-    python: 71,
-    cpp: 54,
-};
+const interviewCodingFinalizers = new Map();
+async function finalizeActiveCodingForInterview(interviewId) {
+    const finalizers = [...(interviewCodingFinalizers.get(interviewId) ?? [])];
+    await Promise.all(finalizers.map((finalize) => finalize()));
+}
 function toPcmBuffer(chunk) {
     if (Buffer.isBuffer(chunk))
         return chunk;
@@ -61,42 +63,6 @@ function toPcmBuffer(chunk) {
         return Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
     }
     return null;
-}
-const CODING_ASSIGNMENT = [
-    {
-        problemId: "two-sum",
-        prompt: "Given an array of integers and a target, return the indices of two numbers that add up to the target.",
-        difficulty: "beginner",
-        minimumInterviewMinutes: 30,
-        timeLimitMinutes: 8,
-    },
-    {
-        problemId: "valid-parentheses",
-        prompt: "Given a string containing parentheses, determine whether the brackets are balanced.",
-        difficulty: "medium",
-        minimumInterviewMinutes: 30,
-        timeLimitMinutes: 8,
-    },
-    {
-        problemId: "longest-substring",
-        prompt: "Given a string, return the length of its longest substring without repeating characters.",
-        difficulty: "hard",
-        minimumInterviewMinutes: 30,
-        timeLimitMinutes: 10,
-    },
-    {
-        problemId: "graph-shortest-path",
-        prompt: "Given a weighted graph and two vertices, find the minimum-cost path between them.",
-        difficulty: "extreme",
-        minimumInterviewMinutes: 50,
-        timeLimitMinutes: 15,
-    },
-];
-function getCodingAssignment(durationMinutes, difficulty) {
-    if (durationMinutes === 15)
-        return null;
-    return (CODING_ASSIGNMENT.find((assignment) => assignment.difficulty === difficulty &&
-        assignment.minimumInterviewMinutes <= durationMinutes) ?? null);
 }
 const registerInterviewHandlers = async (io, socket) => {
     const interviewId = socket.handshake.query.interviewId;
@@ -114,14 +80,20 @@ const registerInterviewHandlers = async (io, socket) => {
     let answerSilenceTimer = null;
     let questionRepeatTimer = null;
     let pendingTranscriptSegments = [];
+    let pendingSpeechDuringCoding = false;
     let lastInterviewerQuestion = "";
+    let lastCandidateSpeechObservedAt = 0;
+    let interviewPromptContext = null;
     let codingAssignment = null;
+    let allowedLanguages = [];
+    let enableSandbox = true;
+    let interviewStartHandled = false;
+    let interviewStartInProgress = false;
+    let phaseVersion = 0;
     let codingActive = false;
     let codingFinishing = false;
-    let codingStartedAt = null;
     let latestCode = "";
     let latestLanguage = "javascript";
-    let pendingCodingContext = null;
     let codingTimeout = null;
     const finishCoding = async (reason, finalCode, finalLanguage) => {
         if (!codingActive || codingFinishing || !codingAssignment)
@@ -129,39 +101,49 @@ const registerInterviewHandlers = async (io, socket) => {
         codingFinishing = true;
         const code = finalCode ?? latestCode;
         const language = finalLanguage ?? latestLanguage;
-        const languageId = JUDGE0_LANGUAGE_MAP[language] ?? 63;
-        const timeSpentSeconds = codingStartedAt === null
-            ? 0
-            : Math.floor((Date.now() - codingStartedAt) / 1000);
         try {
-            await interview_model_1.CodeSubmissionModel.create({
-                interviewId,
-                languageId,
-                sourceCode: code,
-                problemId: codingAssignment.problemId,
-                problemPrompt: codingAssignment.prompt,
-                submissionStatus: reason === "timed_out" ? "timed_out" : "attempted",
-                timeSpentSeconds,
-            });
-            await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
-                sender: "ai",
-                text: `Coding assignment: ${codingAssignment.prompt}`,
-                timestamp: Date.now(),
-            }), JSON.stringify({
-                sender: "candidate",
-                text: `Coding ${reason}. Language: ${language}. Code:\n${code}`,
-                timestamp: Date.now(),
-            }));
+            const submission = await (0, codingSubmission_service_1.finalizeCodingSubmission)(interviewId, reason, code, language);
+            if (!submission) {
+                codingActive = false;
+                codingFinishing = false;
+                if (codingTimeout) {
+                    clearTimeout(codingTimeout);
+                    codingTimeout = null;
+                }
+                return;
+            }
+            const timeSpentSeconds = submission.timeSpentSeconds ?? 0;
+            const assignment = codingAssignment.public;
             codingActive = false;
             codingFinishing = false;
+            phaseVersion += 1;
             if (codingTimeout) {
                 clearTimeout(codingTimeout);
                 codingTimeout = null;
             }
-            const remainingMinutes = interviewDurationMinutes === null || interviewStartedAt === null
-                ? 0
-                : Math.max(0, Math.ceil(interviewDurationMinutes -
-                    (Date.now() - interviewStartedAt) / 60_000));
+            const finalReason = reason === "submitted" ? "submitted" : reason;
+            try {
+                await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
+                    sender: "ai",
+                    text: `Coding assignment: ${assignment.statement}`,
+                    timestamp: Date.now(),
+                }), JSON.stringify({
+                    sender: "candidate",
+                    text: `Coding ${finalReason}. Language: ${language}. Code:\n${code}`,
+                    timestamp: Date.now(),
+                }));
+            }
+            catch (error) {
+                console.error(`Failed to add coding submission to transcript ${interviewId}:`, error);
+            }
+            if (reason === "interview_ended") {
+                io.to(interviewId).emit("coding:completed", {
+                    reason,
+                    submissionStatus: submission.submissionStatus,
+                    testSummary: submission.testSummary,
+                });
+                return;
+            }
             try {
                 const rawTranscript = await redis.lrange(`interview:${interviewId}:transcript`, -20, -1);
                 const conversation = rawTranscript
@@ -169,14 +151,21 @@ const registerInterviewHandlers = async (io, socket) => {
                     .filter((entry) => (entry.sender === "ai" || entry.sender === "candidate") &&
                     typeof entry.text === "string");
                 const codingContext = {
-                    problemPrompt: codingAssignment.prompt,
+                    problemPrompt: assignment.statement,
                     language,
-                    sourceCode: code,
-                    outcome: reason === "timed_out" ? "timed_out" : "attempted",
+                    sourceCode: submission.sourceCode ?? code,
+                    outcome: submission.submissionStatus,
                     timeSpentSeconds,
+                    testSummary: submission.testSummary,
                 };
-                pendingCodingContext = codingContext;
-                const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes ?? 0, remainingMinutes, codingContext);
+                if (interviewDurationMinutes === null ||
+                    interviewStartedAt === null ||
+                    !interviewPromptContext) {
+                    throw new Error("Interview context is unavailable after coding.");
+                }
+                const remainingMinutes = Math.max(0, Math.ceil(interviewDurationMinutes -
+                    (Date.now() - interviewStartedAt) / 60_000));
+                const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes, remainingMinutes, interviewPromptContext, codingContext);
                 await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
                     sender: "ai",
                     text: aiText,
@@ -187,6 +176,8 @@ const registerInterviewHandlers = async (io, socket) => {
                     text: aiText,
                     timestamp: Date.now(),
                 });
+                lastInterviewerQuestion = aiText;
+                scheduleQuestionRepeat();
             }
             catch (error) {
                 console.error(`Failed to generate interview follow-up after coding for interview ${interviewId}`, error);
@@ -195,8 +186,9 @@ const registerInterviewHandlers = async (io, socket) => {
                 });
             }
             io.to(interviewId).emit("coding:completed", {
-                reason,
-                submissionStatus: reason === "timed_out" ? "timed_out" : "attempted",
+                reason: finalReason,
+                submissionStatus: submission.submissionStatus,
+                testSummary: submission.testSummary,
             });
             io.to(interviewId).emit("phase_change", "technical_qa");
         }
@@ -211,11 +203,38 @@ const registerInterviewHandlers = async (io, socket) => {
             questionRepeatTimer = null;
         }
     };
+    const scheduleCodingTimeout = (remainingSeconds) => {
+        if (codingTimeout)
+            clearTimeout(codingTimeout);
+        codingTimeout = setTimeout(() => {
+            void finishCoding("timed_out").catch((error) => {
+                console.error(`Failed to save timed-out coding submission for interview ${interviewId}:`, error);
+                io.to(interviewId).emit("coding:submission_failed", {
+                    message: "Could not save your timed-out coding submission. Please try submitting again.",
+                });
+                io.to(interviewId).emit("interview:error", {
+                    message: "Could not save the coding submission.",
+                });
+            });
+        }, Math.max(0, remainingSeconds) * 1000);
+    };
     const scheduleQuestionRepeat = () => {
         clearQuestionRepeatTimer();
         if (!lastInterviewerQuestion)
             return;
+        const now = Date.now();
+        if (pendingTranscriptSegments.length > 0 ||
+            (lastCandidateSpeechObservedAt > 0 && now - lastCandidateSpeechObservedAt < 15000)) {
+            return;
+        }
         questionRepeatTimer = setTimeout(() => {
+            questionRepeatTimer = null;
+            const nowAfterDelay = Date.now();
+            if (pendingTranscriptSegments.length > 0 ||
+                (lastCandidateSpeechObservedAt > 0 &&
+                    nowAfterDelay - lastCandidateSpeechObservedAt < 15000)) {
+                return;
+            }
             const repeatedQuestion = `I haven't heard a response yet. Let me repeat the question: ${lastInterviewerQuestion}`;
             io.to(interviewId).emit("ai_transcript", {
                 role: "ai",
@@ -231,19 +250,24 @@ const registerInterviewHandlers = async (io, socket) => {
                 .catch((error) => {
                 console.error(`Failed to save repeated question for interview ${interviewId}:`, error);
             });
-            scheduleQuestionRepeat();
         }, 12000);
     };
-    const queueCandidateAnswer = (answer) => {
+    const queueCandidateAnswer = (answer, generateResponse) => {
+        const queuedPhaseVersion = phaseVersion;
         interviewerQueue = interviewerQueue
             .then(async () => {
+            clearQuestionRepeatTimer();
+            lastCandidateSpeechObservedAt = Date.now();
             await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
                 sender: "candidate",
                 text: answer,
                 timestamp: Date.now(),
             }));
-            if (codingActive)
+            if (!generateResponse ||
+                codingActive ||
+                queuedPhaseVersion !== phaseVersion) {
                 return;
+            }
             const recentTranscript = await redis.lrange(`interview:${interviewId}:transcript`, -20, -1);
             const conversation = recentTranscript
                 .map((entry) => JSON.parse(entry))
@@ -252,9 +276,14 @@ const registerInterviewHandlers = async (io, socket) => {
             if (interviewDurationMinutes === null || interviewStartedAt === null) {
                 throw new Error("Interview duration or start time is unavailable.");
             }
+            if (!interviewPromptContext) {
+                throw new Error("Interview focus context is unavailable.");
+            }
             const elapsedMinutes = (Date.now() - interviewStartedAt) / 60_000;
             const remainingMinutes = Math.max(0, Math.ceil(interviewDurationMinutes - elapsedMinutes));
-            const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes, remainingMinutes, pendingCodingContext ?? undefined);
+            const aiText = await (0, interviewAssistant_service_1.generateInterviewerResponse)(conversation, interviewDurationMinutes, remainingMinutes, interviewPromptContext);
+            if (codingActive || queuedPhaseVersion !== phaseVersion)
+                return;
             await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
                 sender: "ai",
                 text: aiText,
@@ -267,7 +296,6 @@ const registerInterviewHandlers = async (io, socket) => {
             });
             lastInterviewerQuestion = aiText;
             scheduleQuestionRepeat();
-            pendingCodingContext = null;
         })
             .catch((error) => {
             console.error(`Interviewer response generation failed for interview ${interviewId}:`, error);
@@ -278,6 +306,90 @@ const registerInterviewHandlers = async (io, socket) => {
             });
         });
     };
+    const flushPendingCandidateSpeech = () => {
+        const answer = pendingTranscriptSegments.join(" ").trim();
+        pendingTranscriptSegments = [];
+        pendingSpeechDuringCoding = false;
+        if (answer)
+            queueCandidateAnswer(answer, false);
+    };
+    const finalizeOnInterviewEnd = async () => {
+        clearQuestionRepeatTimer();
+        if (codingTimeout) {
+            clearTimeout(codingTimeout);
+            codingTimeout = null;
+        }
+        if (answerSilenceTimer) {
+            clearTimeout(answerSilenceTimer);
+            answerSilenceTimer = null;
+        }
+        flushPendingCandidateSpeech();
+        await interviewerQueue;
+        await finishCoding("interview_ended");
+    };
+    const finalizers = interviewCodingFinalizers.get(interviewId) ?? new Set();
+    finalizers.add(finalizeOnInterviewEnd);
+    interviewCodingFinalizers.set(interviewId, finalizers);
+    (0, interviewCoding_handler_1.registerCodingHandlers)({
+        io,
+        socket,
+        interviewId,
+        redis,
+        get interviewDurationMinutes() {
+            return interviewDurationMinutes;
+        },
+        get interviewStartedAt() {
+            return interviewStartedAt;
+        },
+        get codingAssignment() {
+            return codingAssignment;
+        },
+        get allowedLanguages() {
+            return allowedLanguages;
+        },
+        get enableSandbox() {
+            return enableSandbox;
+        },
+        get codingActive() {
+            return codingActive;
+        },
+        set codingActive(value) {
+            codingActive = value;
+        },
+        get codingFinishing() {
+            return codingFinishing;
+        },
+        get phaseVersion() {
+            return phaseVersion;
+        },
+        set phaseVersion(value) {
+            phaseVersion = value;
+        },
+        get latestCode() {
+            return latestCode;
+        },
+        set latestCode(value) {
+            latestCode = value;
+        },
+        get latestLanguage() {
+            return latestLanguage;
+        },
+        set latestLanguage(value) {
+            latestLanguage = value;
+        },
+        get pendingTranscriptSegments() {
+            return pendingTranscriptSegments;
+        },
+        get pendingSpeechDuringCoding() {
+            return pendingSpeechDuringCoding;
+        },
+        set pendingSpeechDuringCoding(value) {
+            pendingSpeechDuringCoding = value;
+        },
+        clearQuestionRepeatTimer,
+        scheduleCodingTimeout,
+        finishCoding,
+    });
     // 1. Register socket listeners immediately so early events are not missed
     socket.on("audio:stream", (rawChunk) => {
         const chunk = toPcmBuffer(rawChunk);
@@ -336,22 +448,95 @@ const registerInterviewHandlers = async (io, socket) => {
         }
     });
     socket.on("start_interview", async () => {
+        if (interviewStartHandled || interviewStartInProgress)
+            return;
+        interviewStartInProgress = true;
+        let shouldGreet = false;
         try {
-            const interview = await interview_model_1.InterviewModel.findById(interviewId).select("durationMinutes difficultyMode");
+            let interview = await interview_model_1.InterviewModel.findById(interviewId);
             if (!interview) {
                 io.to(interviewId).emit("interview:error", {
                     message: "Interview session not found.",
                 });
                 return;
             }
-            interviewDurationMinutes = interview.durationMinutes;
-            if (interviewStartedAt === null) {
-                interviewStartedAt = Date.now();
+            if (interview.status === "processing" || interview.status === "completed") {
+                io.to(interviewId).emit("interview:error", {
+                    message: "This interview has already ended.",
+                });
+                return;
             }
-            codingAssignment =
-                interview.durationMinutes === 15
-                    ? null
-                    : await getCodingAssignment(interview.durationMinutes, interview.difficultyMode);
+            if (interview.status === "scheduled") {
+                const now = new Date();
+                const started = await interview_model_1.InterviewModel.updateOne({ _id: interviewId, status: "scheduled" }, {
+                    $set: {
+                        status: "live",
+                        interviewStartedAt: now,
+                    },
+                });
+                shouldGreet = started.modifiedCount === 1;
+                interview = await interview_model_1.InterviewModel.findById(interviewId);
+                if (!interview)
+                    throw new Error("Interview session disappeared.");
+            }
+            interviewDurationMinutes = interview.durationMinutes;
+            interviewStartedAt =
+                interview.interviewStartedAt?.getTime() ?? Date.now();
+            interviewPromptContext = {
+                roleTitle: interview.roleTitle,
+                targetSkills: interview.targetSkills ?? [],
+                jobDescription: interview.jobDescription,
+                difficultyMode: interview.difficultyMode,
+                resumeText: interview.resumeText ?? "",
+            };
+            allowedLanguages = (interview.allowedLanguages ?? []).map(codingAssignment_service_1.normalizeCodingLanguage);
+            enableSandbox = interview.enableSandbox;
+            if (interview.durationMinutes === 15) {
+                codingAssignment = null;
+            }
+            else {
+                codingAssignment = interview.codingAssignment ?? null;
+                if (!codingAssignment) {
+                    const codingTimeLimitSeconds = interview.durationMinutes === 30 ? 8 * 60 : 15 * 60;
+                    codingAssignment = (0, codingAssignment_service_1.selectCodingAssignment)({
+                        roleTitle: interview.roleTitle,
+                        targetSkills: interview.targetSkills ?? [],
+                        jobDescription: interview.jobDescription,
+                        difficultyMode: interview.difficultyMode,
+                        allowedLanguages,
+                        codingTimeLimitSeconds,
+                    });
+                    if (codingAssignment) {
+                        interview.codingAssignment = codingAssignment;
+                        await interview.save();
+                    }
+                }
+            }
+            if (interview.codingStatus === "active" && codingAssignment) {
+                codingActive = true;
+                phaseVersion += 1;
+                latestCode = interview.codingDraft ?? "";
+                latestLanguage = interview.codingLanguage ?? "javascript";
+                const startedAt = interview.codingStartedAt?.getTime() ?? Date.now();
+                const codingTimeRemaining = Math.max(0, codingAssignment.public.timeLimitSeconds -
+                    Math.floor((Date.now() - startedAt) / 1000));
+                const interviewTimeRemaining = Math.max(0, interviewDurationMinutes * 60 -
+                    Math.floor((Date.now() - interviewStartedAt) / 1000) -
+                    interviewCoding_handler_1.INTERVIEW_CLOSING_RESERVE_SECONDS);
+                const remainingSeconds = Math.min(codingTimeRemaining, interviewTimeRemaining);
+                io.to(interviewId).emit("phase_change", "live_coding");
+                io.to(interviewId).emit("coding:started", {
+                    ...(0, codingAssignment_service_1.toClientAssignment)(codingAssignment),
+                    prompt: codingAssignment.public.statement,
+                    timeLimitSeconds: remainingSeconds,
+                    timeLimitMinutes: Math.ceil(remainingSeconds / 60),
+                    allowedLanguages,
+                    language: latestLanguage,
+                    draft: latestCode,
+                });
+                scheduleCodingTimeout(remainingSeconds);
+            }
+            interviewStartHandled = true;
         }
         catch (error) {
             console.error(`Failed to load interview ${interviewId}:`, error);
@@ -360,121 +545,61 @@ const registerInterviewHandlers = async (io, socket) => {
             });
             return;
         }
+        finally {
+            interviewStartInProgress = false;
+        }
+        if (!shouldGreet)
+            return;
         const greetingText = "Hello! Let's get started with your technical assessment. Can you walk me through your background?";
+        try {
+            await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
+                sender: "ai",
+                text: greetingText,
+                timestamp: Date.now(),
+            }));
+        }
+        catch (error) {
+            console.error(`Failed to save interview greeting ${interviewId}:`, error);
+            io.to(interviewId).emit("interview:error", {
+                message: "Could not start the interview.",
+            });
+            return;
+        }
         io.to(interviewId).emit("ai_transcript", {
             role: "ai",
             text: greetingText,
             timestamp: Date.now(),
         });
-        await redis.rpush(`interview:${interviewId}:transcript`, JSON.stringify({
-            sender: "ai",
-            text: greetingText,
-            timestamp: Date.now(),
-        }));
         lastInterviewerQuestion = greetingText;
         scheduleQuestionRepeat();
-    });
-    socket.on("start_coding", () => {
-        if (!codingAssignment) {
-            io.to(interviewId).emit("coding:unavailable", {
-                message: "No coding assignment is available for this interview.",
-            });
-            return;
-        }
-        codingActive = true;
-        codingFinishing = false;
-        codingStartedAt = Date.now();
-        latestCode = "";
-        clearQuestionRepeatTimer();
-        io.to(interviewId).emit("phase_change", "live_coding");
-        io.to(interviewId).emit("coding:started", {
-            problemId: codingAssignment.problemId,
-            prompt: codingAssignment.prompt,
-            timeLimitMinutes: codingAssignment.timeLimitMinutes,
-        });
-        codingTimeout = setTimeout(() => {
-            void finishCoding("timed_out").catch((error) => {
-                console.error(`Failed to save timed_out coding submission for interview ${interviewId}:`, error);
-                io.to(interviewId).emit("interview:error", {
-                    message: "Could not save the coding submission.",
-                });
-            });
-        }, codingAssignment.timeLimitMinutes * 60_000);
     });
     socket.on("audio:telemetry", (rawPayload) => {
         const parse = interviewSocket_schema_1.VoiceMetricsSchema.safeParse(rawPayload);
         if (!parse.success)
             return;
     });
-    socket.on("sandbox_execute", async (payload) => {
-        const { interviewId, language, code } = payload;
-        if (!interviewId)
-            return;
-        const languageId = JUDGE0_LANGUAGE_MAP[language] || 63;
-        if (codingActive) {
-            latestCode = code;
-            latestLanguage = language;
-        }
-        try {
-            const submissionResponse = await axios_1.default.post(`${JUDGE0_API_URL}/submissions?base64_encoded=false&wait=true`, {
-                source_code: code,
-                language_id: languageId,
-            });
-            const { stdout, stderr, compile_output, message, status } = submissionResponse.data;
-            const finalStdout = stdout || null;
-            const finalStderr = stderr || compile_output || message || null;
-            io.to(interviewId).emit("sandbox_result", {
-                stdout: finalStdout,
-                stderr: finalStderr,
-            });
-            await redis.rpush(`interview:${interviewId}:code`, JSON.stringify({
-                language,
-                code,
-                sandboxResult: {
-                    stdout: finalStdout,
-                    stderr: finalStderr,
-                    status: {
-                        id: status?.id ?? -1,
-                        description: status?.description ?? "Unknown",
-                    },
-                },
-                timestamp: Date.now(),
-            }));
-        }
-        catch (error) {
-            console.error("Judge0 Execution Error:", error.message);
-            io.to(interviewId).emit("sandbox_result", {
-                stdout: null,
-                stderr: `Execution System Error: ${error.message}`,
-                error: "Execution failed",
-            });
-        }
-    });
-    socket.on("submit_coding", async (payload) => {
-        if (!codingActive) {
-            io.to(interviewId).emit("interview:error", {
-                message: "There is no active coding assignment to submit.",
-            });
-            return;
-        }
-        try {
-            await finishCoding("submitted", payload.code, payload.language);
-        }
-        catch (error) {
-            console.error(`Failed to save coding submission for interview ${interviewId}:`, error);
-            io.to(interviewId).emit("interview:error", {
-                message: "Could not save the coding submission.",
-            });
-        }
-    });
     socket.on("disconnect", () => {
+        finalizers.delete(finalizeOnInterviewEnd);
+        if (finalizers.size === 0)
+            interviewCodingFinalizers.delete(interviewId);
         pendingAudioChunks.length = 0;
-        pendingTranscriptSegments = [];
+        flushPendingCandidateSpeech();
         deepgramUnavailable = true;
         clearQuestionRepeatTimer();
         if (answerSilenceTimer) {
             clearTimeout(answerSilenceTimer);
             answerSilenceTimer = null;
+        }
+        if (codingTimeout) {
+            clearTimeout(codingTimeout);
+            codingTimeout = null;
+        }
+        if (codingActive) {
+            void interviewerQueue
+                .then(() => finishCoding("disconnected"))
+                .catch((error) => {
+                console.error(`Failed to finalize coding on disconnect ${interviewId}:`, error);
+            });
         }
         if (dgConnection) {
             dgConnection.close();
@@ -509,11 +634,15 @@ const registerInterviewHandlers = async (io, socket) => {
             }
             if (data?.type === "SpeechStarted") {
                 clearQuestionRepeatTimer();
+                lastCandidateSpeechObservedAt = Date.now();
                 return;
             }
             const transcript = data?.channel?.alternatives?.[0]?.transcript?.trim();
             if (transcript && data.is_final) {
                 clearQuestionRepeatTimer();
+                lastCandidateSpeechObservedAt = Date.now();
+                if (codingActive)
+                    pendingSpeechDuringCoding = true;
                 pendingTranscriptSegments.push(transcript);
                 const answerInProgress = pendingTranscriptSegments.join(" ");
                 io.to(interviewId).emit("stt:transcript", {
@@ -524,18 +653,18 @@ const registerInterviewHandlers = async (io, socket) => {
                     clearTimeout(answerSilenceTimer);
                 answerSilenceTimer = setTimeout(() => {
                     answerSilenceTimer = null;
+                    lastCandidateSpeechObservedAt = Date.now();
                     const answer = pendingTranscriptSegments.join(" ").trim();
                     pendingTranscriptSegments = [];
+                    const generateResponse = !pendingSpeechDuringCoding && !codingActive;
+                    pendingSpeechDuringCoding = false;
                     if (!answer)
                         return;
                     io.to(interviewId).emit("stt:transcript", {
                         transcript: answer,
                         isFinal: true,
                     });
-                    queueCandidateAnswer(answer);
-                    if (codingActive) {
-                        return;
-                    }
+                    queueCandidateAnswer(answer, generateResponse);
                 }, 20000);
             }
         });

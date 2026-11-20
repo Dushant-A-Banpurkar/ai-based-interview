@@ -72,6 +72,31 @@ const InterviewSchema = new mongoose_1.Schema({
         type: [String],
         default: ["javascript", "python", "cpp"],
     },
+    codingAssignment: {
+        type: mongoose_1.Schema.Types.Mixed,
+        default: null,
+    },
+    codingStartedAt: {
+        type: Date,
+        default: null,
+    },
+    codingDraft: {
+        type: String,
+        default: "",
+    },
+    codingLanguage: {
+        type: String,
+        default: "javascript",
+    },
+    codingStatus: {
+        type: String,
+        enum: ["not_started", "active", "completed"],
+        default: "not_started",
+    },
+    interviewStartedAt: {
+        type: Date,
+        default: null,
+    },
     status: {
         type: String,
         enum: ["scheduled", "live", "processing", "completed"],
@@ -126,8 +151,16 @@ const CodeSubmissionSchema = new mongoose_1.Schema({
         enum: ["attempted", "solved", "timed_out"],
         required: true,
     },
+    language: {
+        type: String,
+        trim: true,
+    },
     executionStatus: {
         type: String,
+    },
+    testSummary: {
+        passed: { type: Number, min: 0 },
+        total: { type: Number, min: 0 },
     },
     timeSpentSeconds: {
         type: Number,
@@ -143,5 +176,6 @@ const CodeSubmissionSchema = new mongoose_1.Schema({
     timestamps: true,
     versionKey: false,
 });
+CodeSubmissionSchema.index({ interviewId: 1, problemId: 1 }, { unique: true });
 exports.CodeSubmissionModel = mongoose_1.default.models.CodeSubmission ||
     mongoose_1.default.model("CodeSubmission", CodeSubmissionSchema);

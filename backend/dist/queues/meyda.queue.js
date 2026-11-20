@@ -51,9 +51,24 @@ async function getInterviewTranscript(interviewId) {
     return rawList.map((item) => JSON.parse(item));
 }
 async function getCodeSubmissions(interviewId) {
-    // FIXED: Now correctly reads from code key instead of transcript
-    const rawList = await redis.lrange(`interview:${interviewId}:code`, 0, -1);
-    return rawList.map((item) => JSON.parse(item));
+    const [rawList, durableSubmissions] = await Promise.all([
+        redis.lrange(`interview:${interviewId}:code`, 0, -1),
+        interview_model_1.CodeSubmissionModel.find({ interviewId }).sort({ createdAt: 1 }).lean(),
+    ]);
+    const executionHistory = rawList.map((item) => JSON.parse(item));
+    const finalSubmissions = durableSubmissions.map((item) => ({
+        problemId: item.problemId,
+        problemPrompt: item.problemPrompt,
+        language: item.language,
+        languageId: item.languageId,
+        code: item.sourceCode,
+        submissionStatus: item.submissionStatus,
+        executionStatus: item.executionStatus,
+        testSummary: item.testSummary,
+        timeSpentSeconds: item.timeSpentSeconds,
+        timestamp: item.createdAt?.getTime() ?? 0,
+    }));
+    return [...executionHistory, ...finalSubmissions];
 }
 async function processInterviewJob(interviewId) {
     const rawTelemetry = await redis.lrange(`interview:${interviewId}:telemetry`, 0, -1);
