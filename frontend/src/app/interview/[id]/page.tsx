@@ -152,6 +152,21 @@ export default function LiveInterviewPage({ params }: PageProps) {
                 {isListening ? "Mic Live (Meyda Active)" : "Mic Inactive"}
               </span>
             </div>
+              <button
+                type="button"
+                onClick={() => {
+                  endAttempted.current = true;
+                  endInterviewMutation(interviewId, {
+                    onSuccess: () => {
+                      router.replace(`/interview/${interviewId}/report`);
+                    },
+                  });
+                }}
+                disabled={interviewEnded || endInterview.isPending}
+                className="rounded-xl border border-red-500/40 bg-red-950/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-red-300 transition hover:bg-red-900/40 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {endInterview.isPending ? "Ending..." : "End Interview"}
+              </button>
           </div>
         </header>
 
