@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { useEffect, useState } from "react";
 import { useInterviewReport } from "@/src/hooks/useInterviewReport";
 import { useInterviewStatus } from "@/src/hooks/useInterviewStatus";
 import { useParams } from "next/navigation";
@@ -15,6 +16,15 @@ export default function ReportDashboard() {
     isLoading: isStatusLoading,
     isError: isStatusError,
   } = useInterviewStatus(interviewId);
+  const [processingTimeout, setProcessingTimeout] = useState(false);
+
+  useEffect(() => {
+    if (!report && (interviewStatus?.status === "processing" || isLoading)) {
+      const timeoutId = setTimeout(() => setProcessingTimeout(true), 25000);
+      return () => clearTimeout(timeoutId);
+    }
+    setProcessingTimeout(false);
+  }, [interviewStatus?.status, isLoading, report]);
 
   if (
     isLoading ||
@@ -22,6 +32,19 @@ export default function ReportDashboard() {
       !isStatusError &&
       (isStatusLoading || interviewStatus?.status === "processing"))
   ) {
+    if (processingTimeout) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-slate-950 text-red-400">
+          <div className="max-w-md rounded-xl border border-red-500/30 bg-red-950/20 p-6 text-center">
+            <p className="text-lg font-semibold">Interview report is taking longer than expected.</p>
+            <p className="mt-2 text-sm text-slate-300">
+              The interview ended, but the report has not been generated yet. Please refresh or try again later.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
         <div className="flex flex-col items-center gap-4">
