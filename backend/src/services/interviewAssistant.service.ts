@@ -151,18 +151,6 @@ export async function generateInterviewerResponse(
   );
   const providerErrors: unknown[] = [];
 
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const response = await requestOpenAI(messages);
-      if (response) return response;
-      throw new Error("OpenAI returned an empty interviewer response");
-    } catch (error) {
-      providerErrors.push(error);
-      console.warn(
-        `${providerErrorDetails("OpenAI", error)}; attempting Gemini fallback.`,
-      );
-    }
-  }
 
   if (process.env.GEMINI_API_KEY) {
     try {
@@ -198,6 +186,21 @@ export async function generateInterviewerResponse(
       );
     }
   }
+  
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const response = await requestOpenAI(messages);
+      if (response) return response;
+      throw new Error("OpenAI returned an empty interviewer response");
+    } catch (error) {
+      providerErrors.push(error);
+      console.warn(
+        `${providerErrorDetails("OpenAI", error)}; attempting Gemini fallback.`,
+      );
+    }
+  }
+
+  
 
   if (providerErrors.length > 0) {
     const error = providerErrors[0];
