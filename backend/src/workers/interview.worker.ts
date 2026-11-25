@@ -2,10 +2,7 @@ import * as dotenv from "dotenv";
 import Redis from "ioredis";
 import OpenAI from "openai";
 import { CandidateReportModel } from "../model/candidateReport.model";
-import {
-  CodeSubmissionModel,
-  InterviewModel,
-} from "../model/interview.model";
+import { CodeSubmissionModel, InterviewModel } from "../model/interview.model";
 import { Job, Worker } from "bullmq";
 
 dotenv.config();
@@ -51,10 +48,7 @@ function buildFallbackReport(
   const totalQuestions = transcript.length;
   const baseScore = Math.min(
     100,
-    Math.max(
-      40,
-      55 + solvedCount * 15 + Math.min(attemptedCount, 3) * 5,
-    ),
+    Math.max(40, 55 + solvedCount * 15 + Math.min(attemptedCount, 3) * 5),
   );
 
   return {
@@ -80,11 +74,13 @@ function buildFallbackReport(
       ],
     },
     communicationEvaluation: {
-      score: Math.min(10, Math.max(4, Math.round((audioTelemetrySummary.averageRms || 0) * 10))),
+      score: Math.min(
+        10,
+        Math.max(4, Math.round((audioTelemetrySummary.averageRms || 0) * 10)),
+      ),
       clarityAndStructure:
         "Candidate transcript activity was recorded, but no detailed language assessment could be produced without a provider-backed analysis.",
-      deliveryAndConfidence:
-        `Audio telemetry summary: RMS ${audioTelemetrySummary.averageRms ?? 0}, spectral centroid ${audioTelemetrySummary.averageSpectralCentroid ?? 0}, ZCR ${audioTelemetrySummary.averageZcr ?? 0}.`,
+      deliveryAndConfidence: `Audio telemetry summary: RMS ${audioTelemetrySummary.averageRms ?? 0}, spectral centroid ${audioTelemetrySummary.averageSpectralCentroid ?? 0}, ZCR ${audioTelemetrySummary.averageZcr ?? 0}.`,
     },
     redFlags: [
       "Fallback report mode was used because no AI provider was configured.",
@@ -95,7 +91,8 @@ function buildFallbackReport(
             questionText: item?.question ?? `Question ${index + 1}`,
             score: Math.min(10, Math.max(4, 7 + (solvedCount > 0 ? 1 : 0))),
             candidateResponseSummary:
-              item?.response ?? "No transcript response was captured for this question.",
+              item?.response ??
+              "No transcript response was captured for this question.",
             keyTakeaway:
               "Interview response was logged and included in the fallback evaluation.",
           }))
@@ -223,40 +220,45 @@ Return a JSON object conforming strictly to this structure:
     );
   } else {
     try {
-      if (!openai) throw new Error("OPENAI_API_KEY is not configured.");
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+      if (!gemini) throw new Error("GEMINI_API_KEY is not configured.");
+      const completion = await gemini.chat.completions.create({
+        model: "gemini=3.5-flash-lite",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        temperature: 0.2,
         response_format: { type: "json_object" },
       });
       parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
-    } catch (openaiError: any) {
+    } catch (geminiError: any) {
       console.warn(
-        `[Worker] OpenAI failed (${openaiError.message}). Switching to Gemini for interview report...`,
+        `[Worker] OpenAI failed (${geminiError.message}). Switching to Gemini for interview report...`,
       );
       try {
-        if (!gemini) {
+        if (!openai) {
           throw new Error(
-            "Report generation requires GEMINI_API_KEY when OpenAI is unavailable.",
-            { cause: openaiError },
+            "Report generation requires OPENAI_API_KEY when Gemini is unavailable.",
+            { cause: geminiError },
           );
         }
-        const completion = await gemini.chat.completions.create({
-          model: "gemini-3.5-flash-lite",
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.2,
           response_format: { type: "json_object" },
         });
-        parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
-      } catch (geminiError: any) {
+        parsedReport = JSON.parse(
+          completion.choices[0].message.content || "{}",
+        );
+        parsedReport = JSON.parse(
+          completion.choices[0].message.content || "{}",
+        );
+      } catch (openaiError: any) {
         console.warn(
-          `[Worker] Gemini failed (${geminiError.message}). Writing a fallback report instead...`,
+          `[Worker] Gemini failed (${openaiError.message}). Writing a fallback report instead...`,
         );
         parsedReport = buildFallbackReport(
           interviewId,
@@ -272,19 +274,17 @@ Return a JSON object conforming strictly to this structure:
     overallScore: parsedReport?.overallScore ?? 50,
     recommendation: parsedReport?.recommendation ?? "No Hire",
     executiveSummary: parsedReport?.executiveSummary ?? "",
-    technicalEvaluation:
-      parsedReport?.technicalEvaluation ?? {
-        score: 50,
-        codeAnalysis: "No technical analysis was generated.",
-        strengths: ["Interview activity was recorded."],
-        improvements: ["Configure an AI provider for a richer summary."],
-      },
-    communicationEvaluation:
-      parsedReport?.communicationEvaluation ?? {
-        score: 5,
-        clarityAndStructure: "No communication analysis was generated.",
-        deliveryAndConfidence: "No delivery analysis was generated.",
-      },
+    technicalEvaluation: parsedReport?.technicalEvaluation ?? {
+      score: 50,
+      codeAnalysis: "No technical analysis was generated.",
+      strengths: ["Interview activity was recorded."],
+      improvements: ["Configure an AI provider for a richer summary."],
+    },
+    communicationEvaluation: parsedReport?.communicationEvaluation ?? {
+      score: 5,
+      clarityAndStructure: "No communication analysis was generated.",
+      deliveryAndConfidence: "No delivery analysis was generated.",
+    },
     redFlags: parsedReport?.redFlags ?? [],
     questionBreakdown: parsedReport?.questionBreakdown ?? [],
   };
