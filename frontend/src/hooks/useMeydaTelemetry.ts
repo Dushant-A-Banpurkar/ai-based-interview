@@ -39,6 +39,10 @@ export function useMeydaTelemetry({
             sampleRate: 16000, // Deepgram optimal sample rate
           },
         });
+        if (!isMounted) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
 
         const AudioContextClass =
