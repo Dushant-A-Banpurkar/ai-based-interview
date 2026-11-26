@@ -23,7 +23,10 @@ export default function RootLayout({
       className={cn("font-sans", geist.variable)}
       suppressHydrationWarning={true}
     >
-      <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
+      <body
+        className="bg-slate-950 text-slate-100 antialiased min-h-screen"
+        suppressHydrationWarning={true}
+      >
         <Providers>
           {children}
           <Toaster />
