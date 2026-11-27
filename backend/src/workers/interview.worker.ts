@@ -222,7 +222,7 @@ Return a JSON object conforming strictly to this structure:
     try {
       if (!gemini) throw new Error("GEMINI_API_KEY is not configured.");
       const completion = await gemini.chat.completions.create({
-        model: "gemini=3.5-flash-lite",
+        model: "gemini-3.5-flash-lite",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -233,7 +233,7 @@ Return a JSON object conforming strictly to this structure:
       parsedReport = JSON.parse(completion.choices[0].message.content || "{}");
     } catch (geminiError: any) {
       console.warn(
-        `[Worker] OpenAI failed (${geminiError.message}). Switching to Gemini for interview report...`,
+        `[Worker] Gemini failed (${geminiError.message}). Switching to Openai for interview report...`,
       );
       try {
         if (!openai) {
