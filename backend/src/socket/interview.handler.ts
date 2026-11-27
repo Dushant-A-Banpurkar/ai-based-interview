@@ -178,17 +178,15 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
         ) {
           throw new Error("Interview context is unavailable after coding.");
         }
-        const remainingMinutes = Math.max(
+        const remainingSeconds = Math.max(
           0,
-          Math.ceil(
-            interviewDurationMinutes -
-              (Date.now() - interviewStartedAt) / 60_000,
-          ),
+          interviewDurationMinutes * 60 -
+            Math.floor((Date.now() - interviewStartedAt) / 1000),
         );
         const aiText = await generateInterviewerResponse(
           conversation,
           interviewDurationMinutes,
-          remainingMinutes,
+          remainingSeconds,
           interviewPromptContext,
           codingContext,
         );
@@ -346,16 +344,16 @@ export const registerInterviewHandlers = async (io: Server, socket: Socket) => {
           throw new Error("Interview focus context is unavailable.");
         }
 
-        const elapsedMinutes = (Date.now() - interviewStartedAt) / 60_000;
-        const remainingMinutes = Math.max(
+        const remainingSeconds = Math.max(
           0,
-          Math.ceil(interviewDurationMinutes - elapsedMinutes),
+          interviewDurationMinutes * 60 -
+            Math.floor((Date.now() - interviewStartedAt) / 1000),
         );
 
         const aiText = await generateInterviewerResponse(
           conversation,
           interviewDurationMinutes,
-          remainingMinutes,
+          remainingSeconds,
           interviewPromptContext,
         );
         if (codingActive || queuedPhaseVersion !== phaseVersion) return;
