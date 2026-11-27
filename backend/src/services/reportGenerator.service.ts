@@ -69,6 +69,20 @@ export async function generateCandidateReport(
     ${(JSON.stringify(data.audioTelemetryAverage), null, 2)}`;
   let rawContent: any;
   try {
+    const chatcompletion = await gemini.chat.completions.create({
+      model: "gemini-3.5-flash-lite",
+      messages: [
+        { role: "system", content: system_prompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+    });
+    rawContent = chatcompletion.choices[0].message.content;
+  } catch (geminiError:any) {
+    console.warn(
+      `Gemini failed (${geminiError.message}). Switching to openai..`,
+    );
     const chatcompletion = await openai.chat.completions.create({
       model: "gpt-4o-2024-08-06",
       messages: [
@@ -82,21 +96,38 @@ export async function generateCandidateReport(
       ),
     });
     rawContent = chatcompletion.choices[0].message.content;
-  } catch (openaiError:any) {
-    console.warn(
-      `OpenAI failed (${openaiError.message}). Switching to Gemini...`,
-    );
-    const chatcompletion = await gemini.chat.completions.create({
-      model: "gemini-3.5-flash-lite",
-      messages: [
-        { role: "system", content: system_prompt },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    });
-    rawContent = chatcompletion.choices[0].message.content;
   }
+
+  // Future purpose for openai credits only
+  // try {
+  //   const chatcompletion = await openai.chat.completions.create({
+  //     model: "gpt-4o-2024-08-06",
+  //     messages: [
+  //       { role: "system", content: system_prompt },
+  //       { role: "user", content: userContent },
+  //     ],
+  //     temperature: 0.2,
+  //     response_format: zodResponseFormat(
+  //       CandidateReportSchema,
+  //       "candidate_report",
+  //     ),
+  //   });
+  //   rawContent = chatcompletion.choices[0].message.content;
+  // } catch (openaiError:any) {
+  //   console.warn(
+  //     `OpenAI failed (${openaiError.message}). Switching to Gemini...`,
+  //   );
+  //   const chatcompletion = await gemini.chat.completions.create({
+  //     model: "gemini-3.5-flash-lite",
+  //     messages: [
+  //       { role: "system", content: system_prompt },
+  //       { role: "user", content: userContent },
+  //     ],
+  //     temperature: 0.2,
+  //     response_format: { type: "json_object" },
+  //   });
+  //   rawContent = chatcompletion.choices[0].message.content;
+  // }
   if (!rawContent) {
     throw new Error("Failed to parse candidate report from AI response.");
   }
